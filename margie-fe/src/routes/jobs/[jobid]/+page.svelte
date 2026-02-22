@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { onMount, onDestroy } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { authHeaders, clearToken } from '$lib/auth.js';
 
 	function getApiUrl() {
 		if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
@@ -78,12 +80,15 @@
 		if (pollInterval) clearInterval(pollInterval);
 	});
 
+	function handle401() { clearToken(); goto('/login'); }
+
 	async function fetchJobStatus() {
 		console.log('Fetching job status...')
 		try {
 			const apiUrl = getApiUrl();
 			console.log('API URL:', apiUrl, 'Job ID:', jobId);
-			const res = await fetch(`${apiUrl}/v1/ssh/job_status/${jobId}`);
+			const res = await fetch(`${apiUrl}/v1/ssh/job_status/${jobId}`, { headers: authHeaders() });
+			if (res.status === 401) { handle401(); return; }
 			if (!res.ok) throw new Error('Failed to fetch job status');
 			job = await res.json();
 			error = '';
@@ -122,7 +127,8 @@
 		try {
 			const apiUrl = getApiUrl();
 			const params = subdir ? `?subdir=${encodeURIComponent(subdir)}` : '';
-			const res = await fetch(`${apiUrl}/v1/ssh/job_files/${jobId}${params}`);
+			const res = await fetch(`${apiUrl}/v1/ssh/job_files/${jobId}${params}`, { headers: authHeaders() });
+			if (res.status === 401) { handle401(); return; }
 			if (!res.ok) throw new Error('Failed to list files');
 			const data = await res.json();
 			outputFiles = data.entries;
@@ -135,10 +141,24 @@
 		}
 	}
 
-	function getDownloadUrl(fileName: string): string {
+	async function downloadFile(fileName: string) {
 		const apiUrl = getApiUrl();
 		const relativePath = currentSubdir ? `${currentSubdir}/${fileName}` : fileName;
-		return `${apiUrl}/v1/ssh/download_file/${jobId}?path=${encodeURIComponent(relativePath)}`;
+		const url = `${apiUrl}/v1/ssh/download_file/${jobId}?path=${encodeURIComponent(relativePath)}`;
+		try {
+			const res = await fetch(url, { headers: authHeaders() });
+			if (res.status === 401) { handle401(); return; }
+			if (!res.ok) { filesError = 'Download failed'; return; }
+			const blob = await res.blob();
+			const blobUrl = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = blobUrl;
+			a.download = fileName;
+			a.click();
+			URL.revokeObjectURL(blobUrl);
+		} catch (e) {
+			filesError = e instanceof Error ? e.message : 'Download failed';
+		}
 	}
 
 	function navigateToDir(dirName: string) {
@@ -456,11 +476,11 @@
 									</div>
 									<div class="flex items-center gap-3">
 										<span class="text-xs text-surface-400">{formatFileSize(entry.size)}</span>
-										<a
-											href={getDownloadUrl(entry.name)}
+										<button
+											type="button"
+											onclick={() => downloadFile(entry.name)}
 											class="text-xs text-primary-500 hover:text-primary-400"
-											download
-										>Download</a>
+										>Download</button>
 									</div>
 								</div>
 							{/if}

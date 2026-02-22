@@ -1,8 +1,12 @@
 <script lang="ts">
-	// Use relative URL so it works in both dev and production
+	import { goto } from '$app/navigation';
+	import { authHeaders, clearToken } from '$lib/auth.js';
+
 	const API_URL = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-		? 'http://localhost:8000' // Dev: connect to local backend
-		: ''; // Production: use relative URL (same domain)
+		? 'http://localhost:8000'
+		: '';
+
+	function handle401() { clearToken(); goto('/login'); }
 
 	let entries = $state<string[]>([]);
 	let searchPath = $state('/depot/lindems/data/');
@@ -16,7 +20,11 @@
 		try {
 			loading = true;
 			error = '';
-			const response = await fetch(`${API_URL}/v1/ssh/all_genomes?path=${encodeURIComponent(searchPath)}`);
+			const response = await fetch(
+				`${API_URL}/v1/ssh/all_genomes?path=${encodeURIComponent(searchPath)}`,
+				{ headers: authHeaders() }
+			);
+			if (response.status === 401) { handle401(); return; }
 			if (!response.ok) throw new Error('Failed to fetch files');
 			const data = await response.json();
 			entries = data.Genomes;

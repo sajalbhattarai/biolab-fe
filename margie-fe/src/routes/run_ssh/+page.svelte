@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { authHeaders, clearToken } from '$lib/auth.js';
 
-	// Use relative URL so it works in both dev and production
 	const API_URL = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-		? 'http://localhost:8000' // Dev: connect to local backend
-		: ''; // Production: use relative URL (same domain)
+		? 'http://localhost:8000'
+		: '';
+
+	function handle401() { clearToken(); goto('/login'); }
 
 	let scriptContent = $state('');
 	let loading = $state(false);
@@ -25,18 +27,16 @@
 
 			const response = await fetch(`${API_URL}/v1/ssh/run_ssh`, {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
+				headers: authHeaders(),
 				body: JSON.stringify({ script: scriptContent }),
 			});
 
+			if (response.status === 401) { handle401(); return; }
 			if (!response.ok) throw new Error('Failed to submit job');
 
 			const data = await response.json();
 			const jobId = data.job_id;
 
-			// Clear the input after successful submission
 			scriptContent = '';
 
 		} catch (e) {

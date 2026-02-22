@@ -1,8 +1,17 @@
 <script lang="ts">
-  import { Calendar, CircleUser, Menu, Search, X } from 'lucide-svelte';
-  import { AppBar } from '@skeletonlabs/skeleton-svelte'
+  import { goto, afterNavigate } from '$app/navigation';
+  import { Calendar, CircleUser, LogOut, Menu, X } from 'lucide-svelte';
+  import { AppBar } from '@skeletonlabs/skeleton-svelte';
+  import { isLoggedIn, clearToken } from '$lib/auth.js';
 
-  let drawerOpen = false;
+  let drawerOpen = $state(false);
+  let loggedIn = $state(false);
+
+  // Re-check on every navigation (including the redirect after login).
+  // afterNavigate also fires on first mount, replacing the need for onMount.
+  afterNavigate(() => {
+    loggedIn = isLoggedIn();
+  });
 
   function toggleDrawer() {
     drawerOpen = !drawerOpen;
@@ -10,6 +19,11 @@
 
   function closeDrawer() {
     drawerOpen = false;
+  }
+
+  function logout() {
+    clearToken();
+    goto('/login');
   }
 </script>
 
@@ -24,7 +38,14 @@
 			<a href="/" class="text-2xl font-bold hover:text-primary-600 transition-colors cursor-pointer">Bioinformatics Supercomputing Platform</a>
 		</AppBar.Headline>
 		<AppBar.Trail>
-			<a href="/profile/" class="btn-icon hover:preset-tonal"><CircleUser class="size-6" /></a>
+			{#if loggedIn}
+				<a href="/profile/" class="btn-icon hover:preset-tonal" title="Profile"><CircleUser class="size-6" /></a>
+				<button type="button" class="btn-icon hover:preset-tonal" title="Sign out" on:click={logout}>
+					<LogOut class="size-5" />
+				</button>
+			{:else}
+				<a href="/login" class="btn variant-outline-primary text-sm px-4 py-1">Sign in</a>
+			{/if}
 		</AppBar.Trail>
 	</AppBar.Toolbar>
 </AppBar>

@@ -1,10 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { authHeaders, clearToken } from '$lib/auth.js';
 
 	const API_URL = typeof window !== 'undefined' && window.location.hostname === 'localhost'
 		? 'http://localhost:8000'
 		: '';
 
+	let user = $state<{ username: string; cluster_username: string; cluster_host: string; home_dir: string } | null>(null);
 	let config = $state<Record<string, any>>({});
 	let loading = $state(false);
 	let saving = $state(false);
@@ -12,18 +15,34 @@
 	let success = $state('');
 	let connected = $state(false);
 	let checking = $state(true);
-	let sshUsername = $state('');
-	let sshPublicKey = $state('');
 
 	onMount(async () => {
-		await checkConnection();
+		await loadUser();
 	});
+
+	async function loadUser() {
+		try {
+			const res = await fetch(`${API_URL}/v1/auth/me`, { headers: authHeaders() });
+			if (res.status === 401) {
+				clearToken();
+				goto('/login');
+				return;
+			}
+			if (!res.ok) throw new Error('Failed to load user profile');
+			user = await res.json();
+			await checkConnection();
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to load profile';
+			checking = false;
+		}
+	}
 
 	async function checkConnection() {
 		checking = true;
 		error = '';
 		try {
-			const res = await fetch(`${API_URL}/v1/ssh/status`);
+			const res = await fetch(`${API_URL}/v1/ssh/status`, { headers: authHeaders() });
+			if (res.status === 401) { clearToken(); goto('/login'); return; }
 			if (!res.ok) throw new Error('Could not reach backend');
 			const data = await res.json();
 			connected = data.connected;
@@ -38,41 +57,12 @@
 		}
 	}
 
-	async function connect() {
-		if (!sshUsername.trim()) {
-			error = 'Please enter a username';
-			return;
-		}
-		if (!sshPublicKey.trim()) {
-			error = 'Please provide a public key path';
-			return;
-		}
-		checking = true;
-		error = '';
-		try {
-			const res = await fetch(`${API_URL}/v1/ssh/connect`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					username: sshUsername,
-					public_key: sshPublicKey
-				})
-			});
-			if (!res.ok) throw new Error('Failed to establish SSH connection');
-			connected = true;
-			await loadConfig();
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to connect';
-		} finally {
-			checking = false;
-		}
-	}
-
 	async function loadConfig() {
 		loading = true;
 		error = '';
 		try {
-			const res = await fetch(`${API_URL}/v1/ssh/config`);
+			const res = await fetch(`${API_URL}/v1/ssh/config`, { headers: authHeaders() });
+			if (res.status === 401) { clearToken(); goto('/login'); return; }
 			if (!res.ok) throw new Error('Failed to load config');
 			config = await res.json();
 		} catch (e) {
@@ -87,11 +77,12 @@
 		error = '';
 		success = '';
 		try {
-			const res = await fetch(`${API_URL}/v1/config`, {
+			const res = await fetch(`${API_URL}/v1/ssh/config`, {
 				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(config)
+				headers: authHeaders(),
+				body: JSON.stringify(config),
 			});
+			if (res.status === 401) { clearToken(); goto('/login'); return; }
 			if (!res.ok) throw new Error('Failed to save config');
 			success = 'Configuration saved successfully.';
 			setTimeout(() => success = '', 3000);
@@ -121,7 +112,11 @@
 	<section class="text-center py-8">
 		<h1 class="text-4xl font-bold text-primary-500 mb-4">Profile Settings</h1>
 		<p class="text-lg text-surface-600 dark:text-surface-300">
-			Configuration from <code class="font-mono text-sm bg-surface-200 dark:bg-surface-700 px-2 py-1 rounded">ddeemer@negishi.rcac.purdue.edu</code>
+			{#if user}
+				Configuration from <code class="font-mono text-sm bg-surface-200 dark:bg-surface-700 px-2 py-1 rounded">{user.cluster_username}@{user.cluster_host}</code>
+			{:else}
+				Loading profile...
+			{/if}
 		</p>
 	</section>
 
@@ -141,41 +136,17 @@
 		{:else if connected}
 			<div class="flex items-center gap-2">
 				<span class="inline-block w-3 h-3 rounded-full bg-green-500"></span>
-				<span class="text-green-700 dark:text-green-400 font-semibold">Connected to negishi.rcac.purdue.edu</span>
+				<span class="text-green-700 dark:text-green-400 font-semibold">Connected to {user?.cluster_host}</span>
 			</div>
 		{:else}
-			<div class="space-y-4">
-				<div class="flex items-center gap-2">
-					<span class="inline-block w-3 h-3 rounded-full bg-red-500"></span>
-					<span class="text-red-700 dark:text-red-400 font-semibold">Not connected</span>
-				</div>
-				<div class="space-y-4">
-					<div>
-						<label for="sshUsername" class="block text-sm font-semibold mb-1">Username</label>
-						<input
-							id="sshUsername"
-							type="text"
-							bind:value={sshUsername}
-							placeholder="e.g., ddeemer"
-							class="input w-full px-4 py-2 rounded-lg bg-surface-200 dark:bg-surface-700 border border-surface-300 dark:border-surface-600"
-						/>
-					</div>
-					<div>
-						<label for="sshPublicKey" class="block text-sm font-semibold mb-1">Public Key</label>
-						<textarea
-							id="sshPublicKey"
-							bind:value={sshPublicKey}
-							placeholder="Paste your public key here (e.g., ssh-rsa AAAA...)"
-							rows="4"
-							class="input w-full px-4 py-2 rounded-lg bg-surface-200 dark:bg-surface-700 border border-surface-300 dark:border-surface-600 font-mono text-sm"
-						></textarea>
-						<p class="text-xs text-surface-500 mt-1">Copy from <code class="font-mono">~/.ssh/id_rsa.pub</code> on your local machine</p>
-					</div>
-				</div>
-				<button type="button" onclick={connect} class="btn variant-filled-primary px-6 py-2">
-					Connect
-				</button>
+			<div class="flex items-center gap-2">
+				<span class="inline-block w-3 h-3 rounded-full bg-red-500"></span>
+				<span class="text-red-700 dark:text-red-400 font-semibold">Could not connect to {user?.cluster_host}</span>
 			</div>
+			<p class="text-sm text-surface-500 mt-2">Check that your cluster is reachable and your SSH key is still valid.</p>
+			<button type="button" onclick={checkConnection} class="btn variant-outline-primary mt-4 px-4 py-2 text-sm">
+				Retry
+			</button>
 		{/if}
 	</section>
 
@@ -196,7 +167,6 @@
 							<div class="space-y-3">
 								{#each Object.entries(value) as [key, val]}
 									{#if isObject(val)}
-										<!-- Nested object (e.g., program settings) -->
 										<details class="group bg-surface-300 dark:bg-surface-600 rounded-lg">
 											<summary class="cursor-pointer p-3 font-semibold flex justify-between items-center hover:bg-surface-400 dark:hover:bg-surface-500 rounded-lg transition-colors">
 												<span>{key}</span>
@@ -284,7 +254,6 @@
 							</div>
 						</div>
 					{:else}
-						<!-- Top-level scalar -->
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
 							<label class="text-sm font-semibold font-mono">{section}</label>
 							<input
@@ -311,7 +280,7 @@
 		</section>
 	{:else if connected}
 		<section class="card p-6 bg-surface-100 dark:bg-surface-800 text-center">
-			<p class="text-surface-500">No configuration found. Check that <code class="font-mono text-sm">~/.config/bioinformatics-tools/config.yaml</code> exists on negishi.</p>
+			<p class="text-surface-500">No configuration found. Check that <code class="font-mono text-sm">~/.config/bioinformatics-tools/config.yaml</code> exists on {user?.cluster_host}.</p>
 		</section>
 	{/if}
 </div>
