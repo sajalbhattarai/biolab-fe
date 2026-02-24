@@ -17,6 +17,8 @@
 	let loading = $state(false);
 	let quickLoading = $state(false);
 	let freshLoading = $state(false);
+	let showQuickInfo = $state(false);
+	let showFreshInfo = $state(false);
 	let error = $state('');
 
 	// Live preview of the full output path (timestamp is illustrative — generated server-side)
@@ -180,33 +182,74 @@
 			type="button"
 			onclick={handleAnalyze}
 			disabled={loading}
-			class="btn variant-filled-primary px-8 py-2"
+			class="btn px-10 py-3 text-lg font-bold text-white bg-purple-500 hover:bg-green-500 disabled:opacity-50 shadow-lg transition-colors"
 		>
 			{loading ? 'Starting Analysis...' : 'Analyze'}
 		</button>
 	</div>
 
-	<!-- Quick Workflows -->
-	<div class="card p-6 bg-surface-100 dark:bg-surface-800 mt-8">
-		<h2 class="text-2xl font-semibold mb-4">Quick Workflows</h2>
-		<p class="text-sm text-surface-500 mb-4">Touch-only workflows on Negishi — tests SSH, snakemake, and DB cache pipeline (no containers).</p>
-		<div class="flex gap-4">
-			<button
-				type="button"
-				onclick={() => runWorkflow('run_quick_example', (v) => quickLoading = v)}
-				disabled={quickLoading}
-				class="btn px-6 py-2 text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
-			>
-				{quickLoading ? 'Running...' : 'Quick Example'}
-			</button>
-			<button
-				type="button"
-				onclick={() => runWorkflow('run_fresh_test', (v) => freshLoading = v)}
-				disabled={freshLoading}
-				class="btn px-6 py-2 text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50"
-			>
-				{freshLoading ? 'Running...' : 'Fresh Test'}
-			</button>
+	<!-- Divider -->
+	<div class="flex items-center gap-4 mt-8">
+		<div class="flex-1 border-t border-surface-300 dark:border-surface-600"></div>
+		<span class="text-sm text-surface-400 dark:text-surface-500 font-medium uppercase tracking-widest">Sanity Checks</span>
+		<div class="flex-1 border-t border-surface-300 dark:border-surface-600"></div>
+	</div>
+
+	<!-- Test Workflows -->
+	<div class="card p-6 bg-surface-100 dark:bg-surface-800 mt-4">
+		<h2 class="text-2xl font-semibold mb-1">Test Workflows</h2>
+		<p class="text-sm text-surface-500 mb-6">Run these before submitting real jobs to verify SSH, Snakemake, and the pipeline are all working correctly.</p>
+
+		<div class="flex flex-wrap gap-4">
+			<!-- Quick Example -->
+			<div class="flex flex-col gap-2">
+				<div class="flex items-center gap-2">
+					<button
+						type="button"
+						onclick={() => runWorkflow('run_quick_example', (v) => quickLoading = v)}
+						disabled={quickLoading}
+						class="btn px-6 py-2 text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
+					>
+						{quickLoading ? 'Running...' : 'Quick Example'}
+					</button>
+					<button
+						type="button"
+						onclick={() => showQuickInfo = !showQuickInfo}
+						class="btn-icon size-7 rounded-full border border-surface-400 dark:border-surface-500 text-surface-500 hover:bg-surface-200 dark:hover:bg-surface-700 text-sm font-bold transition-colors"
+						aria-label="More info about Quick Example"
+					>?</button>
+				</div>
+				{#if showQuickInfo}
+					<div class="text-xs text-surface-600 dark:text-surface-300 bg-surface-200 dark:bg-surface-700 rounded-lg p-3 max-w-xs">
+						Runs a lightweight end-to-end test over SSH — touches Snakemake and the DB cache pipeline without spinning up containers. If you've run it before, it will likely <span class="font-semibold text-emerald-600 dark:text-emerald-400">cache hit</span> and finish almost instantly.
+					</div>
+				{/if}
+			</div>
+
+			<!-- Fresh Test -->
+			<div class="flex flex-col gap-2">
+				<div class="flex items-center gap-2">
+					<button
+						type="button"
+						onclick={() => runWorkflow('run_fresh_test', (v) => freshLoading = v)}
+						disabled={freshLoading}
+						class="btn px-6 py-2 text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50"
+					>
+						{freshLoading ? 'Running...' : 'Fresh Test'}
+					</button>
+					<button
+						type="button"
+						onclick={() => showFreshInfo = !showFreshInfo}
+						class="btn-icon size-7 rounded-full border border-surface-400 dark:border-surface-500 text-surface-500 hover:bg-surface-200 dark:hover:bg-surface-700 text-sm font-bold transition-colors"
+						aria-label="More info about Fresh Test"
+					>?</button>
+				</div>
+				{#if showFreshInfo}
+					<div class="text-xs text-surface-600 dark:text-surface-300 bg-surface-200 dark:bg-surface-700 rounded-lg p-3 max-w-xs">
+						Always writes to a temporary directory and <span class="font-semibold text-amber-600 dark:text-amber-400">bypasses the cache</span>, so you get a true fresh run every time. Use this when you want to verify the full pipeline works end-to-end without relying on any prior state.
+					</div>
+				{/if}
+			</div>
 		</div>
 	</div>
 </div>
