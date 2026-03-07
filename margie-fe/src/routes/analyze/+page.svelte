@@ -9,11 +9,30 @@
 
 	function handle401() { clearToken(); goto('/login'); }
 
+	interface WorkflowDetails {
+		id: string;
+		label: string;
+		description: string;
+		full_description: string;
+		tools: Array<{name: string; purpose: string; version: string; output: string}>;
+		configurable_params: Array<{param: string; default: any; description: string; type: string}>;
+		database_deps: string[];
+		docs_url: string | null;
+		containers: Array<{name: string; version: string}>;
+		// Backend also returns these fields
+		cmd_identifier: string;
+		snakemake_file: string;
+		other: string[];
+		sif_files: Array<[string, string]>;
+	}
+
 	let genomePath = $state('');
 	let outputDir = $state('');
 	let homeDir = $state('');
 	let selectedWorkflow = $state('margie');
-	let availableWorkflows = $state<{id: string, label: string, description: string}[]>([]);
+	let availableWorkflows = $state<WorkflowDetails[]>([]);
+	let selectedWorkflowDetails = $state<WorkflowDetails | null>(null);
+	let showWorkflowModal = $state(false);
 	let loading = $state(false);
 	let quickLoading = $state(false);
 	let freshLoading = $state(false);
@@ -78,6 +97,15 @@
 		}
 	}
 
+	function showWorkflowInfo(workflow: WorkflowDetails) {
+		selectedWorkflowDetails = workflow;
+		showWorkflowModal = true;
+	}
+
+	function closeWorkflowModal() {
+		showWorkflowModal = false;
+	}
+
 	async function handleAnalyze() {
 		if (!genomePath.trim()) {
 			error = 'Please provide a genome file';
@@ -99,7 +127,10 @@
 			});
 
 			if (response.status === 401) { handle401(); return; }
-			if (!response.ok) throw new Error('Failed to start analysis');
+			if (!response.ok) {
+				const errData = await response.json().catch(() => ({}));
+				throw new Error(errData.detail || 'Failed to start analysis');
+			}
 
 			const data = await response.json();
 			console.log('Analysis started:', data);
@@ -131,17 +162,26 @@
 		<h2 class="text-2xl font-semibold mb-4">Workflow</h2>
 		<div class="flex flex-wrap gap-3">
 			{#each availableWorkflows as wf}
-				<button
-					type="button"
-					onclick={() => selectedWorkflow = wf.id}
-					class="flex flex-col items-start px-5 py-3 rounded-lg border-2 text-left transition-colors
-						{selectedWorkflow === wf.id
-							? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
-							: 'border-surface-300 dark:border-surface-600 hover:border-surface-400 dark:hover:border-surface-500'}"
-				>
-					<span class="font-semibold">{wf.label}</span>
-					<span class="text-xs text-surface-500 dark:text-surface-400 mt-0.5">{wf.description}</span>
-				</button>
+				<div class="relative">
+					<button
+						type="button"
+						onclick={() => selectedWorkflow = wf.id}
+						class="flex flex-col items-start px-5 py-3 pr-12 rounded-lg border-2 text-left transition-colors
+							{selectedWorkflow === wf.id
+								? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+								: 'border-surface-300 dark:border-surface-600 hover:border-surface-400 dark:hover:border-surface-500'}"
+					>
+						<span class="font-semibold">{wf.label}</span>
+						<span class="text-xs text-surface-500 dark:text-surface-400 mt-0.5">{wf.description}</span>
+					</button>
+					<button
+						type="button"
+						onclick={() => showWorkflowInfo(wf)}
+						class="absolute top-3 right-3 btn-icon size-6 rounded-full bg-surface-200 dark:bg-surface-700 hover:bg-surface-300 dark:hover:bg-surface-600 text-surface-600 dark:text-surface-300 text-sm font-bold transition-colors"
+						aria-label={`More info about ${wf.label}`}
+						title={`Learn more about ${wf.label}`}
+					>?</button>
+				</div>
 			{/each}
 		</div>
 	</div>
@@ -198,7 +238,7 @@
 	<!-- Test Workflows -->
 	<div class="card p-6 bg-surface-100 dark:bg-surface-800 mt-4">
 		<h2 class="text-2xl font-semibold mb-1">Test Workflows</h2>
-		<p class="text-sm text-surface-500 mb-6">Run these before submitting real jobs to verify SSH, Snakemake, and the pipeline are all working correctly.</p>
+		<p class="text-sm text-surface-500 mb-6">You can run these before submitting real jobs to verify SSH, Snakemake, and the pipeline are all working correctly.</p>
 
 		<div class="flex flex-wrap gap-4">
 			<!-- Quick Example -->
@@ -253,3 +293,136 @@
 		</div>
 	</div>
 </div>
+
+<!-- Workflow Details Modal -->
+{#if showWorkflowModal && selectedWorkflowDetails}
+	<div
+		class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+		onclick={closeWorkflowModal}
+		role="button"
+		tabindex="-1"
+		onkeydown={(e) => e.key === 'Escape' && closeWorkflowModal()}
+	>
+		<div
+			class="bg-surface-100 dark:bg-surface-800 rounded-lg shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+			onclick={(e) => e.stopPropagation()}
+			role="dialog"
+			tabindex="-1"
+		>
+			<!-- Header -->
+			<div class="sticky top-0 bg-surface-100 dark:bg-surface-800 border-b border-surface-300 dark:border-surface-600 px-6 py-4 flex justify-between items-center">
+				<h2 class="text-2xl font-bold text-primary-500">{selectedWorkflowDetails.label}</h2>
+				<button
+					type="button"
+					onclick={closeWorkflowModal}
+					class="btn-icon size-8 rounded-full hover:bg-surface-200 dark:hover:bg-surface-700 text-xl"
+					aria-label="Close"
+				>&times;</button>
+			</div>
+
+			<!-- Content -->
+			<div class="px-6 py-4 space-y-6">
+				<!-- Description -->
+				<div>
+					<h3 class="text-lg font-semibold mb-2 text-secondary-500">Description</h3>
+					<p class="text-surface-700 dark:text-surface-300">{selectedWorkflowDetails.full_description || selectedWorkflowDetails.description}</p>
+				</div>
+
+				<!-- Tools -->
+				{#if selectedWorkflowDetails.tools && selectedWorkflowDetails.tools.length > 0}
+					<div>
+						<h3 class="text-lg font-semibold mb-3 text-secondary-500">Tools & Programs</h3>
+						<div class="space-y-3">
+							{#each selectedWorkflowDetails.tools as tool}
+								<div class="bg-surface-200 dark:bg-surface-700 rounded-lg p-4">
+									<div class="flex items-center justify-between mb-1">
+										<span class="font-semibold text-primary-600 dark:text-primary-400">{tool.name}</span>
+										<span class="text-xs font-mono bg-surface-300 dark:bg-surface-600 px-2 py-0.5 rounded">v{tool.version}</span>
+									</div>
+									<p class="text-sm text-surface-600 dark:text-surface-400 mb-1">{tool.purpose}</p>
+									{#if tool.output}
+										<p class="text-xs text-surface-500 dark:text-surface-500">
+											<span class="font-semibold">Output:</span> {tool.output}
+										</p>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<!-- Configurable Parameters -->
+				{#if selectedWorkflowDetails.configurable_params && selectedWorkflowDetails.configurable_params.length > 0}
+					<div>
+						<h3 class="text-lg font-semibold mb-3 text-secondary-500">Configurable Parameters</h3>
+						<div class="space-y-2">
+							{#each selectedWorkflowDetails.configurable_params as param}
+								<div class="bg-surface-200 dark:bg-surface-700 rounded p-3">
+									<div class="flex items-baseline gap-2 mb-1">
+										<code class="font-mono text-sm font-semibold text-primary-600 dark:text-primary-400">{param.param}</code>
+										<span class="text-xs text-surface-500">({param.type})</span>
+									</div>
+									<p class="text-sm text-surface-600 dark:text-surface-400 mb-1">{param.description}</p>
+									<p class="text-xs font-mono text-surface-500 dark:text-surface-500">
+										<span class="font-semibold">Default:</span> {param.default}
+									</p>
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<!-- Database Dependencies -->
+				{#if selectedWorkflowDetails.database_deps && selectedWorkflowDetails.database_deps.length > 0}
+					<div>
+						<h3 class="text-lg font-semibold mb-2 text-secondary-500">Database Requirements</h3>
+						<ul class="list-disc list-inside space-y-1 text-surface-700 dark:text-surface-300">
+							{#each selectedWorkflowDetails.database_deps as dep}
+								<li>{dep}</li>
+							{/each}
+						</ul>
+					</div>
+				{/if}
+
+				<!-- Containers -->
+				{#if selectedWorkflowDetails.containers && selectedWorkflowDetails.containers.length > 0}
+					<div>
+						<h3 class="text-lg font-semibold mb-2 text-secondary-500">Containers</h3>
+						<div class="flex flex-wrap gap-2">
+							{#each selectedWorkflowDetails.containers as container}
+								<span class="inline-flex items-center gap-1 bg-surface-200 dark:bg-surface-700 px-3 py-1 rounded-full text-sm">
+									<span class="font-mono">{container.name}</span>
+									<span class="text-xs text-surface-500">({container.version})</span>
+								</span>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<!-- Documentation Link -->
+				{#if selectedWorkflowDetails.docs_url}
+					<div>
+						<a
+							href={selectedWorkflowDetails.docs_url}
+							target="_blank"
+							rel="noopener noreferrer"
+							class="inline-flex items-center gap-2 text-primary-500 hover:text-primary-700 font-semibold"
+						>
+							<span>View Documentation</span>
+							<span class="text-xs">↗</span>
+						</a>
+					</div>
+				{/if}
+			</div>
+
+			<!-- Footer -->
+			<div class="sticky bottom-0 bg-surface-100 dark:bg-surface-800 border-t border-surface-300 dark:border-surface-600 px-6 py-4 flex justify-end">
+				<button
+					type="button"
+					onclick={closeWorkflowModal}
+					class="btn variant-filled-primary px-6 py-2"
+				>Close</button>
+			</div>
+		</div>
+	</div>
+{/if}
