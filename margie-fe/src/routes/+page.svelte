@@ -35,11 +35,13 @@
 			</button>
 
 			<!-- Secondary tools -->
-			<div class="grid grid-cols-3 gap-3">
+			<div class="grid grid-cols-2 gap-3">
+				<!-- TODO: Re-enable when SLURM credentials/resources can be specified
 				<button class="card p-4 bg-surface-100 dark:bg-surface-800 hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors text-center" on:click={() => goto('run_script')}>
 					<div class="text-2xl mb-1">⚙️</div>
 					<p class="text-sm font-medium">Run SLURM</p>
 				</button>
+				-->
 				<button class="card p-4 bg-surface-100 dark:bg-surface-800 hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors text-center" on:click={() => goto('run_ssh')}>
 					<div class="text-2xl mb-1">🖥️</div>
 					<p class="text-sm font-medium">Run SSH</p>

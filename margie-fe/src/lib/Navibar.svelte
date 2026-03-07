@@ -86,9 +86,11 @@
 			<a href="/filesearch" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
 				<p class="text-lg font-semibold">File Search</p>
 			</a>
+			<!-- TODO: Re-enable when SLURM credentials/resources can be specified
 			<a href="/run_script" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
 				<p class="text-lg font-semibold">Run Slurm</p>
 			</a>
+			-->
 			<a href="/run_ssh" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
 				<p class="text-lg font-semibold">Run SSH</p>
 			</a>
@@ -101,13 +103,17 @@
 
 			<div class="border-t border-surface-300 dark:border-surface-600 my-2"></div>
 
-			<a href="/roadmap" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
+			<a href="/profile" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
+				<p class="text-lg font-semibold">Profile</p>
+			</a>
+
+			<!-- <a href="/roadmap" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
 				<p class="text-lg font-semibold">Roadmap</p>
 			</a>
 			<a href="/methods" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
 				<p class="text-lg font-semibold">Methods</p>
 			</a>
-			<!-- <a href="/contributors" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
+			<a href="/contributors" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
 				<p class="text-lg font-semibold">Contributors</p>
 			</a> -->
 		</nav>
