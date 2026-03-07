@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto, afterNavigate } from '$app/navigation';
-  import { Calendar, CircleUser, LogOut, Menu, X } from 'lucide-svelte';
+  import { Home, LogOut, Menu, X } from 'lucide-svelte';
+  import avatar from '$lib/assets/neuromancer.jpg';
   import { AppBar } from '@skeletonlabs/skeleton-svelte';
   import { isLoggedIn, clearToken } from '$lib/auth.js';
 
@@ -35,13 +36,18 @@
 			</button>
 		</AppBar.Lead>
 		<AppBar.Headline>
-			<a href="/" class="text-2xl font-bold hover:text-primary-600 transition-colors cursor-pointer">Bioinformatics Supercomputing Platform</a>
+			<a href="/" class="flex items-center gap-2 text-2xl font-bold hover:text-primary-600 transition-colors cursor-pointer" title="Go home">
+				<Home class="size-6 shrink-0" />
+				Bioinformatics Supercomputing Platform
+			</a>
 		</AppBar.Headline>
 		<AppBar.Trail>
 			{#if loggedIn}
-				<a href="/profile/" class="btn-icon hover:preset-tonal" title="Profile"><CircleUser class="size-6" /></a>
-				<button type="button" class="btn-icon hover:preset-tonal" title="Sign out" on:click={logout}>
-					<LogOut class="size-5" />
+				<a href="/profile/" title="Profile" class="hover:opacity-80 transition-opacity">
+					<img src={avatar} alt="Profile" class="size-10 rounded-full object-cover ring-2 ring-surface-300 dark:ring-surface-600" />
+				</a>
+				<button type="button" class="btn-icon btn-icon-lg hover:preset-tonal" title="Sign out" on:click={logout}>
+					<LogOut class="size-8" />
 				</button>
 			{:else}
 				<a href="/login" class="btn variant-outline-primary text-sm px-4 py-1">Sign in</a>
@@ -74,48 +80,42 @@
 		</div>
 
 		<nav class="space-y-2">
-			<a href="/" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
-				<p class="text-lg font-semibold">Home</p>
-			</a>
 			<a href="/analyze" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
 				<p class="text-lg font-semibold">Analyze</p>
 			</a>
 			<a href="/filesearch" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
 				<p class="text-lg font-semibold">File Search</p>
 			</a>
+			<!-- TODO: Re-enable when SLURM credentials/resources can be specified
 			<a href="/run_script" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
 				<p class="text-lg font-semibold">Run Slurm</p>
 			</a>
+			-->
 			<a href="/run_ssh" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
 				<p class="text-lg font-semibold">Run SSH</p>
 			</a>
 
 			<div class="border-t border-surface-300 dark:border-surface-600 my-2"></div>
 
-			<a href="/results/mock" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
-				<p class="text-lg font-semibold">Results (Mock)</p>
-			</a>
 			<a href="/results/historical" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
 				<p class="text-lg font-semibold">Results (Historical)</p>
 			</a>
 
 			<div class="border-t border-surface-300 dark:border-surface-600 my-2"></div>
 
-			<a href="/roadmap" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
+			<a href="/profile" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
+				<p class="text-lg font-semibold">Profile</p>
+			</a>
+
+			<!-- <a href="/roadmap" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
 				<p class="text-lg font-semibold">Roadmap</p>
 			</a>
 			<a href="/methods" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
 				<p class="text-lg font-semibold">Methods</p>
 			</a>
-			<!-- <a href="/contributors" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
+			<a href="/contributors" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
 				<p class="text-lg font-semibold">Contributors</p>
 			</a> -->
-			<a href="/dane" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
-				<p class="text-lg font-semibold">Dane</p>
-			</a>
-			<a href="/profile" class="block p-4 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors" on:click={closeDrawer}>
-				<p class="text-lg font-semibold">Profile</p>
-			</a>
 		</nav>
 	</div>
 </div>
