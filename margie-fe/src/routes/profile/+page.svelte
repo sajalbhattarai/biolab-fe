@@ -2,6 +2,8 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { authHeaders, clearToken } from '$lib/auth.js';
+	import ConfigSection from '$lib/ConfigSection.svelte';
+	import ConfigField from '$lib/ConfigField.svelte';
 
 	const API_URL = typeof window !== 'undefined' && window.location.hostname === 'localhost'
 		? 'http://localhost:8000'
@@ -9,6 +11,7 @@
 
 	let user = $state<{ username: string; cluster_username: string; cluster_host: string; home_dir: string } | null>(null);
 	let config = $state<Record<string, any>>({});
+	let workflows = $state<any[]>([]);
 	let loading = $state(false);
 	let saving = $state(false);
 	let savingCredentials = $state(false);
@@ -28,8 +31,30 @@
 	let editPrivateKey = $state('');
 	let showPrivateKey = $state(false);
 
+	// Form state for structured config
+	let formValues = $state<Record<string, any>>({});
+
+	// Check if required config fields are missing
+	let missingRequiredFields = $derived.by(() => {
+		const missing: string[] = [];
+
+		// Check main_database
+		if (!formValues.main_database || formValues.main_database.trim() === '') {
+			missing.push('main_database');
+		}
+
+		// Check compute.cluster-default.account
+		const account = formValues.compute?.['cluster-default']?.account;
+		if (!account || account.trim() === '') {
+			missing.push('SLURM account');
+		}
+
+		return missing;
+	});
+
 	onMount(async () => {
 		await loadUser();
+		await loadWorkflows();
 	});
 
 	async function loadUser() {
@@ -44,8 +69,10 @@
 			user = await res.json();
 
 			// Populate credentials form with current values
-			editClusterHost = user.cluster_host;
-			editClusterUsername = user.cluster_username;
+			if (user) {
+				editClusterHost = user.cluster_host;
+				editClusterUsername = user.cluster_username;
+			}
 
 			await checkConnection();
 		} catch (e) {
@@ -74,6 +101,17 @@
 		}
 	}
 
+	async function loadWorkflows() {
+		try {
+			const res = await fetch(`${API_URL}/v1/ssh/workflows`, { headers: authHeaders() });
+			if (res.ok) {
+				workflows = await res.json();
+			}
+		} catch (e) {
+			console.error('Failed to load workflows:', e);
+		}
+	}
+
 	async function loadConfig() {
 		loading = true;
 		error = '';
@@ -82,6 +120,9 @@
 			if (res.status === 401) { clearToken(); goto('/login'); return; }
 			if (!res.ok) throw new Error('Failed to load config');
 			config = await res.json();
+
+			// Populate form values from config
+			formValues = { ...config };
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load config';
 		} finally {
@@ -113,14 +154,82 @@
 		}
 	}
 
+	// Group configurable params by section
+	function groupParamsBySection(workflows: any[]): Map<string, any[]> {
+		const sections = new Map<string, any[]>();
+
+		workflows.forEach(workflow => {
+			workflow.configurable_params?.forEach((param: any) => {
+				const parts = param.param.split('.');
+				const section = parts[0]; // e.g., "compute", "prodigal", "pfam"
+
+				if (!sections.has(section)) {
+					sections.set(section, []);
+				}
+				sections.get(section)!.push(param);
+			});
+		});
+
+		return sections;
+	}
+
+	// Build config to save - syncs YAML to exactly match what user sees in UI
+	function buildConfigToSave(): Record<string, any> {
+		const configToSave: Record<string, any> = {};
+		const allParams = workflows.flatMap(wf => wf.configurable_params || []);
+
+		// Write ALL parameters to YAML - what you see is what you get
+		allParams.forEach((param: any) => {
+			const parts = param.param.split('.');
+			const value = getNestedValue(formValues, parts);
+
+			// Use the value from form if set, otherwise use the default
+			const finalValue = (value !== null && value !== undefined && value !== '')
+				? value
+				: param.default;
+
+			// Write to config if we have a value (even if it's the default)
+			if (finalValue !== null && finalValue !== undefined) {
+				setNestedValue(configToSave, parts, finalValue);
+			}
+		});
+
+		// Always include main_database - use value or default
+		const mainDb = formValues.main_database?.trim();
+		configToSave.main_database = mainDb || '~/.local/share/bioinformatics-tools/my-db.db';
+
+		return configToSave;
+	}
+
+	function getNestedValue(obj: any, path: string[]): any {
+		return path.reduce((current, key) => current?.[key], obj);
+	}
+
+	function setNestedValue(obj: any, path: string[], value: any) {
+		const lastKey = path[path.length - 1];
+		const parent = path.slice(0, -1).reduce((current, key) => {
+			if (!current[key]) current[key] = {};
+			return current[key];
+		}, obj);
+		parent[lastKey] = value;
+	}
+
+	function updateFormValue(param: string, value: any) {
+		const parts = param.split('.');
+		setNestedValue(formValues, parts, value);
+		formValues = { ...formValues }; // Trigger reactivity
+	}
+
 	async function saveConfig() {
 		saving = true;
 		error = '';
 		success = '';
 
+		const configToSave = buildConfigToSave();
+
 		// If main_database exists, test it before saving
-		if (config.main_database) {
-			await testPathWritable(config.main_database);
+		if (configToSave.main_database) {
+			await testPathWritable(configToSave.main_database);
 			if (pathTestResult && !pathTestResult.writable) {
 				error = `Cannot save: main_database path is not writable. ${pathTestResult.error || ''}`;
 				saving = false;
@@ -132,10 +241,14 @@
 			const res = await fetch(`${API_URL}/v1/ssh/config`, {
 				method: 'PUT',
 				headers: authHeaders(),
-				body: JSON.stringify(config),
+				body: JSON.stringify(configToSave),
 			});
 			if (res.status === 401) { clearToken(); goto('/login'); return; }
 			if (!res.ok) throw new Error('Failed to save config');
+
+			// Update local config state
+			config = configToSave;
+
 			success = 'Configuration saved successfully.';
 			setTimeout(() => success = '', 3000);
 		} catch (e) {
@@ -296,6 +409,31 @@
 		{/if}
 	</section>
 
+	<!-- Required Fields Warning -->
+	{#if connected && Object.keys(config).length > 0 && missingRequiredFields.length > 0}
+		<section class="card p-6 bg-red-50 dark:bg-red-900/20 border-2 border-red-500">
+			<div class="flex items-start gap-3">
+				<span class="text-red-600 dark:text-red-400 text-2xl">⚠️</span>
+				<div class="flex-1">
+					<h3 class="text-lg font-bold text-red-900 dark:text-red-100 mb-2">
+						Required Configuration Missing
+					</h3>
+					<p class="text-red-800 dark:text-red-200 mb-3">
+						The following required fields must be set before you can run workflows:
+					</p>
+					<ul class="list-disc list-inside space-y-1 text-red-700 dark:text-red-300 mb-3">
+						{#each missingRequiredFields as field}
+							<li class="font-mono">{field}</li>
+						{/each}
+					</ul>
+					<p class="text-sm text-red-800 dark:text-red-200">
+						Please scroll down and fill in these required fields in the configuration form below.
+					</p>
+				</div>
+			</div>
+		</section>
+	{/if}
+
 	<!-- Config Section -->
 	{#if loading}
 		<section class="card p-6 bg-surface-100 dark:bg-surface-800 text-center">
@@ -319,168 +457,124 @@
 				</div>
 			</div>
 
-			<div class="space-y-6">
-				{#each Object.entries(config) as [section, value]}
-					{#if isObject(value)}
-						<div class="bg-surface-200 dark:bg-surface-700 rounded-lg p-4">
-							<h3 class="text-xl font-semibold mb-4 text-secondary-500 border-b border-surface-300 dark:border-surface-600 pb-2">{section}</h3>
-							<div class="space-y-3">
-								{#each Object.entries(value) as [key, val]}
-									{#if isObject(val)}
-										<details class="group bg-surface-300 dark:bg-surface-600 rounded-lg">
-											<summary class="cursor-pointer p-3 font-semibold flex justify-between items-center hover:bg-surface-400 dark:hover:bg-surface-500 rounded-lg transition-colors">
-												<span>{key}</span>
-												<span class="transform transition-transform group-open:rotate-180">▼</span>
-											</summary>
-											<div class="p-3 pt-0 space-y-2">
-												{#each Object.entries(val) as [subKey, subVal]}
-													<div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-														<label class="text-sm font-semibold font-mono">{subKey}</label>
-														{#if Array.isArray(subVal)}
-															<div class="flex flex-wrap gap-2 items-center">
-																{#each subVal as item, i}
-																	<span class="inline-flex items-center gap-1 bg-primary-200 dark:bg-primary-800 text-primary-800 dark:text-primary-200 px-2 py-1 rounded font-mono text-sm">
-																		<input
-																			type="text"
-																			value={String(item)}
-																			oninput={(e) => { config[section][key][subKey][i] = e.currentTarget.value; }}
-																			class="bg-transparent border-none outline-none w-16 text-sm font-mono"
-																		/>
-																		<button type="button" onclick={() => removeItem(config[section][key][subKey], i)} class="text-primary-600 dark:text-primary-300 hover:text-red-500 font-bold">&times;</button>
-																	</span>
-																{/each}
-																<button type="button" onclick={() => addItem(config[section][key][subKey])} class="text-primary-500 hover:text-primary-700 text-xl font-bold leading-none">+</button>
-															</div>
-														{:else}
-															<input
-																type="text"
-																value={String(subVal ?? '')}
-																oninput={(e) => { config[section][key][subKey] = e.currentTarget.value; }}
-																class="input px-3 py-2 rounded bg-white dark:bg-surface-800 border border-surface-400 dark:border-surface-500 font-mono text-sm"
-															/>
-														{/if}
-													</div>
-												{/each}
-											</div>
-										</details>
-									{:else if Array.isArray(val)}
-										<div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-											<label class="text-sm font-semibold font-mono">{key}</label>
-											<div class="flex flex-wrap gap-2 items-center">
-												{#each val as item, i}
-													<span class="inline-flex items-center gap-1 bg-primary-200 dark:bg-primary-800 text-primary-800 dark:text-primary-200 px-2 py-1 rounded font-mono text-sm">
-														<input
-															type="text"
-															value={String(item)}
-															oninput={(e) => { config[section][key][i] = e.currentTarget.value; }}
-															class="bg-transparent border-none outline-none w-16 text-sm font-mono"
-														/>
-														<button type="button" onclick={() => removeItem(config[section][key], i)} class="text-primary-600 dark:text-primary-300 hover:text-red-500 font-bold">&times;</button>
-													</span>
-												{/each}
-												<button type="button" onclick={() => addItem(config[section][key])} class="text-primary-500 hover:text-primary-700 text-xl font-bold leading-none">+</button>
-											</div>
-										</div>
-									{:else}
-										<div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-											<label class="text-sm font-semibold font-mono">{key}</label>
-											<input
-												type="text"
-												value={String(val ?? '')}
-												oninput={(e) => { config[section][key] = e.currentTarget.value; }}
-												class="input px-3 py-2 rounded bg-white dark:bg-surface-800 border border-surface-400 dark:border-surface-500 font-mono text-sm"
-											/>
-										</div>
-									{/if}
-								{/each}
-							</div>
-						</div>
-					{:else if Array.isArray(value)}
-						<div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-							<label class="text-sm font-semibold font-mono">{section}</label>
-							<div class="flex flex-wrap gap-2 items-center">
-								{#each value as item, i}
-									<span class="inline-flex items-center gap-1 bg-primary-200 dark:bg-primary-800 text-primary-800 dark:text-primary-200 px-2 py-1 rounded font-mono text-sm">
-										<input
-											type="text"
-											value={String(item)}
-											oninput={(e) => { config[section][i] = e.currentTarget.value; }}
-											class="bg-transparent border-none outline-none w-16 text-sm font-mono"
-										/>
-										<button type="button" onclick={() => removeItem(config[section], i)} class="text-primary-600 dark:text-primary-300 hover:text-red-500 font-bold">&times;</button>
-									</span>
-								{/each}
-								<button type="button" onclick={() => addItem(config[section])} class="text-primary-500 hover:text-primary-700 text-xl font-bold leading-none">+</button>
-							</div>
-						</div>
-					{:else}
-						<!-- Special handling for main_database -->
-						{#if section === 'main_database'}
-							<div class="bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-300 dark:border-amber-700 rounded-lg p-5">
-								<div class="flex items-start gap-3 mb-3">
-									<span class="text-amber-600 dark:text-amber-400 text-xl font-bold">⚠️</span>
-									<div class="flex-1">
-										<h3 class="text-lg font-semibold font-mono text-amber-900 dark:text-amber-100 mb-1">{section}</h3>
-										<p class="text-sm text-amber-800 dark:text-amber-200">
-											This path must be writable by your user. The database file will be created here if it doesn't exist.
-										</p>
-									</div>
-								</div>
+			<!-- Structured Configuration Forms -->
+			<div class="space-y-4">
+				{#each [...groupParamsBySection(workflows)].sort((a, b) => {
+					// Sort: required sections first, then alphabetically
+					const aRequired = a[1].some(p => p.required);
+					const bRequired = b[1].some(p => p.required);
+					if (aRequired && !bRequired) return -1;
+					if (!aRequired && bRequired) return 1;
+					return a[0].localeCompare(b[0]);
+				}) as [sectionName, params]}
+					{@const hasRequired = params.some(p => p.required)}
+					{@const isCompute = sectionName === 'compute'}
+					{@const sectionTitle = sectionName.charAt(0).toUpperCase() + sectionName.slice(1)}
 
-								<div class="space-y-3">
-									<input
-										type="text"
-										value={String(value ?? '')}
-										oninput={(e) => { config[section] = e.currentTarget.value; pathTestResult = null; }}
-										class="input w-full px-4 py-2 rounded bg-white dark:bg-amber-900/40 border-2 border-amber-300 dark:border-amber-600 font-mono text-sm"
-										placeholder="~/.local/share/bioinformatics-tools/my-db.db"
-									/>
+					{#if isCompute}
+						<!-- Special handling for compute.cluster-default -->
+						<ConfigSection
+							title="SLURM Configuration"
+							description="Configure cluster execution settings"
+							required={hasRequired}
+							collapsible={false}
+							defaultExpanded={true}
+						>
+							{#each params as param}
+								{@const parts = param.param.split('.')}
+								{@const value = getNestedValue(formValues, parts)}
 
-									<div class="flex items-center gap-3">
-										<button
-											type="button"
-											onclick={() => testPathWritable(config[section])}
-											disabled={testingPath || !config[section]}
-											class="btn variant-filled-secondary px-4 py-2 text-sm"
-										>
-											{testingPath ? 'Testing...' : 'Test Writability'}
-										</button>
-
-										{#if pathTestResult}
-											{#if pathTestResult.writable}
-												<div class="flex items-center gap-2 text-green-700 dark:text-green-400">
-													<span class="inline-block w-2 h-2 rounded-full bg-green-500"></span>
-													<span class="text-sm font-semibold">Path is writable ✓</span>
-												</div>
-											{:else}
-												<div class="flex items-center gap-2 text-red-700 dark:text-red-400">
-													<span class="inline-block w-2 h-2 rounded-full bg-red-500"></span>
-													<span class="text-sm font-semibold">Path is not writable ✗</span>
-												</div>
-											{/if}
-										{/if}
-									</div>
-
-									{#if pathTestResult && !pathTestResult.writable && pathTestResult.error}
-										<div class="text-xs text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30 rounded p-2 font-mono">
-											{pathTestResult.error}
-										</div>
-									{/if}
-								</div>
-							</div>
-						{:else}
-							<div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-								<label class="text-sm font-semibold font-mono">{section}</label>
-								<input
-									type="text"
-									value={String(value ?? '')}
-									oninput={(e) => { config[section] = e.currentTarget.value; }}
-									class="input px-3 py-2 rounded bg-white dark:bg-surface-800 border border-surface-400 dark:border-surface-500 font-mono text-sm"
+								<ConfigField
+									param={param.param}
+									type={param.type}
+									description={param.description}
+									default={param.default}
+									required={param.required || false}
+									value={value}
+									onchange={(newVal) => updateFormValue(param.param, newVal)}
 								/>
-							</div>
-						{/if}
+							{/each}
+						</ConfigSection>
+					{:else}
+						<!-- Tool-specific configuration sections -->
+						<ConfigSection
+							title={sectionTitle}
+							description="Configure {sectionTitle} execution parameters"
+							required={false}
+							collapsible={true}
+							defaultExpanded={false}
+						>
+							{#each params as param}
+								{@const parts = param.param.split('.')}
+								{@const value = getNestedValue(formValues, parts)}
+
+								<ConfigField
+									param={param.param}
+									type={param.type}
+									description={param.description}
+									default={param.default}
+									required={param.required || false}
+									value={value}
+									onchange={(newVal) => updateFormValue(param.param, newVal)}
+								/>
+							{/each}
+						</ConfigSection>
 					{/if}
 				{/each}
+
+				<!-- Special handling for main_database -->
+				<div class="bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-300 dark:border-amber-700 rounded-lg p-5">
+					<div class="flex items-start gap-3 mb-3">
+						<span class="text-amber-600 dark:text-amber-400 text-xl font-bold">⚠️</span>
+						<div class="flex-1">
+							<h3 class="text-lg font-semibold font-mono text-amber-900 dark:text-amber-100 mb-1">main_database</h3>
+							<p class="text-sm text-amber-800 dark:text-amber-200">
+								This path must be writable by your user. The database file will be created here if it doesn't exist.
+							</p>
+						</div>
+					</div>
+
+					<div class="space-y-3">
+						<input
+							type="text"
+							bind:value={formValues.main_database}
+							oninput={() => pathTestResult = null}
+							class="input w-full px-4 py-2 rounded bg-white dark:bg-amber-900/40 border-2 border-amber-300 dark:border-amber-600 font-mono text-sm"
+							placeholder="~/.local/share/bioinformatics-tools/my-db.db"
+						/>
+
+						<div class="flex items-center gap-3">
+							<button
+								type="button"
+								onclick={() => testPathWritable(formValues.main_database)}
+								disabled={testingPath || !formValues.main_database}
+								class="btn variant-filled-secondary px-4 py-2 text-sm"
+							>
+								{testingPath ? 'Testing...' : 'Test Writability'}
+							</button>
+
+							{#if pathTestResult}
+								{#if pathTestResult.writable}
+									<div class="flex items-center gap-2 text-green-700 dark:text-green-400">
+										<span class="inline-block w-2 h-2 rounded-full bg-green-500"></span>
+										<span class="text-sm font-semibold">Path is writable ✓</span>
+									</div>
+								{:else}
+									<div class="flex items-center gap-2 text-red-700 dark:text-red-400">
+										<span class="inline-block w-2 h-2 rounded-full bg-red-500"></span>
+										<span class="text-sm font-semibold">Path is not writable ✗</span>
+									</div>
+								{/if}
+							{/if}
+						</div>
+
+						{#if pathTestResult && !pathTestResult.writable && pathTestResult.error}
+							<div class="text-xs text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30 rounded p-2 font-mono">
+								{pathTestResult.error}
+							</div>
+						{/if}
+					</div>
+				</div>
 			</div>
 
 			<div class="flex justify-center mt-8">
@@ -493,6 +587,58 @@
 					{saving ? 'Saving...' : 'Save Configuration'}
 				</button>
 			</div>
+
+			<!-- Configuration Guide -->
+			<div class="mt-6 pt-6 border-t border-surface-300 dark:border-surface-600">
+				<details class="text-left">
+					<summary class="cursor-pointer text-sm text-primary-500 hover:text-primary-700 font-semibold mb-3">
+						📖 Configuration Guide
+					</summary>
+					<div class="mt-3 space-y-3 text-sm text-surface-700 dark:text-surface-300">
+						<div class="bg-surface-200 dark:bg-surface-700 rounded-lg p-4 space-y-3">
+							<h4 class="font-semibold text-primary-600 dark:text-primary-400">Hierarchical Config Pattern</h4>
+							<p>
+								Workflow rules follow a pattern where <code class="font-mono bg-surface-300 dark:bg-surface-600 px-1 py-0.5 rounded">run_&lt;tool&gt;</code>
+								reads from config key <code class="font-mono bg-surface-300 dark:bg-surface-600 px-1 py-0.5 rounded">&lt;tool&gt;:</code>
+							</p>
+							<div class="bg-surface-100 dark:bg-surface-800 rounded p-3 font-mono text-xs">
+								<pre># Example: rule run_prodigal reads from:
+prodigal:
+  threads: 1        # CPU threads
+  mem_mb: 2048      # Memory in MB
+  runtime: 30       # Runtime limit (minutes)</pre>
+							</div>
+						</div>
+
+						<div class="bg-surface-200 dark:bg-surface-700 rounded-lg p-4 space-y-3">
+							<h4 class="font-semibold text-primary-600 dark:text-primary-400">Customizing Tool Parameters</h4>
+							<p>Each tool (prodigal, pfam, cog, dbcan, kofam) can be configured independently. Common parameters:</p>
+							<ul class="list-disc list-inside space-y-1 ml-2">
+								<li><code class="font-mono bg-surface-300 dark:bg-surface-600 px-1 py-0.5 rounded">threads</code> - Number of CPU threads</li>
+								<li><code class="font-mono bg-surface-300 dark:bg-surface-600 px-1 py-0.5 rounded">mem_mb</code> - Memory limit in MB</li>
+								<li><code class="font-mono bg-surface-300 dark:bg-surface-600 px-1 py-0.5 rounded">runtime</code> - Time limit in minutes</li>
+								<li><code class="font-mono bg-surface-300 dark:bg-surface-600 px-1 py-0.5 rounded">db</code> - Database path (tool-specific)</li>
+							</ul>
+						</div>
+
+						<div class="bg-surface-200 dark:bg-surface-700 rounded-lg p-4 space-y-3">
+							<h4 class="font-semibold text-primary-600 dark:text-primary-400">Adding New Workflows</h4>
+							<p class="text-xs">
+								To add a new workflow: create a <code class="font-mono bg-surface-300 dark:bg-surface-600 px-1 py-0.5 rounded">.smk</code> file
+								with a corresponding WorkflowKey. It will work with built-in defaults until you customize parameters here.
+								All new workflows automatically support the hierarchical config pattern.
+							</p>
+						</div>
+
+						<div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+							<p class="text-xs text-blue-900 dark:text-blue-100">
+								<strong>💡 Tip:</strong> You only need to specify parameters you want to override.
+								Unspecified values use sensible defaults defined in each workflow rule.
+							</p>
+						</div>
+					</div>
+				</details>
+			</div>
 		</section>
 	{:else if connected}
 		<section class="card p-6 bg-surface-100 dark:bg-surface-800 text-center space-y-4">
@@ -500,14 +646,14 @@
 			<p class="text-surface-500 text-sm">
 				The file <code class="font-mono text-sm bg-surface-200 dark:bg-surface-700 px-2 py-1 rounded">~/.config/bioinformatics-tools/config.yaml</code> does not exist on {user?.cluster_host}.
 			</p>
-			<div class="pt-4">
+			<div class="pt-6 pb-2">
 				<button
 					type="button"
 					onclick={createDefaultConfig}
 					disabled={creatingConfig}
-					class="btn variant-filled-primary px-8 py-3"
+					class="btn variant-filled-success text-lg font-bold px-12 py-4 shadow-lg hover:shadow-xl transition-shadow"
 				>
-					{creatingConfig ? 'Creating...' : 'Create Default Configuration'}
+					{creatingConfig ? 'Creating...' : '✨ Create Default Configuration'}
 				</button>
 			</div>
 			<div class="pt-2 px-8">
