@@ -51,10 +51,51 @@
 		end_time?: string;
 		genome_path?: string;
 		work_dir?: string;
+		cluster_host?: string;
 		sub_jobs: SubJob[];
 		slurm_jobs?: SlurmJob[];
 		containers?: ContainerInfo[];
 		logs?: string;
+	}
+
+	interface LogGroup {
+		type: 'normal' | 'pip';
+		lines: string[];
+		done: boolean;
+	}
+
+	function isPipLine(line: string): boolean {
+		return (
+			/^Resolved \d+ package/.test(line) ||
+			/^Prepared \d+ package/.test(line) ||
+			/^Installed \d+ package/.test(line) ||
+			/^ \+ [\w]/.test(line) ||
+			/[━─]{10}/.test(line) ||
+			/^Downloading /.test(line) ||
+			/^Collecting /.test(line) ||
+			/^Installing collected/.test(line) ||
+			/^Successfully installed/.test(line) ||
+			/^Using cached/.test(line) ||
+			/^Requirement already satisfied/.test(line)
+		);
+	}
+
+	function processLogs(logs: string): LogGroup[] {
+		const lines = logs.split('\n').filter(l => l.trim());
+		const groups: LogGroup[] = [];
+		let current: LogGroup | null = null;
+		for (const line of lines) {
+			const type: 'pip' | 'normal' = isPipLine(line) ? 'pip' : 'normal';
+			if (!current || current.type !== type) {
+				current = { type, lines: [], done: false };
+				groups.push(current);
+			}
+			current.lines.push(line);
+			if (type === 'pip' && /^(Successfully installed|Installed \d+ package)/.test(line)) {
+				current.done = true;
+			}
+		}
+		return groups;
 	}
 
 	let jobId = $derived($page.params.jobid);
@@ -64,6 +105,8 @@
 	let pollInterval: ReturnType<typeof setInterval> | null = null;
 	let showLogs = $state(true);  // Show logs by default
 	let showContainers = $state(true);
+	let expandPipLogs = $state(false);
+	let logGroups = $derived(job?.logs ? processLogs(job.logs) : []);
 
 	let outputFiles = $state<FileEntry[]>([]);
 	let currentSubdir = $state('');
@@ -505,10 +548,32 @@
 			{#if showLogs}
 				<div class="mt-4 p-4 bg-surface-900 text-green-400 font-mono text-sm rounded-lg overflow-x-auto max-h-96 overflow-y-auto">
 					{#if job.logs}
-						{#each job.logs.split('\n').filter(line => line.trim()) as line, i}
-							<div class="py-1 {i > 0 ? 'border-t border-surface-700' : ''}">
-								<span class="text-surface-500 mr-2 select-none">{i + 1}</span>{line}
-							</div>
+						{#each logGroups as group}
+							{#if group.type === 'pip'}
+								<div class="py-1 border-t border-surface-700 first:border-t-0">
+									<span class="text-surface-500 mr-2 select-none">—</span>
+									<span class="text-yellow-400">
+										{group.done
+											? `Completed bioinformatics-tools pip package on ${job.cluster_host ?? 'remote server'}`
+											: `Downloading bioinformatics-tools pip package on ${job.cluster_host ?? 'remote server'}`}
+									</span>
+									<button type="button"
+										class="ml-2 text-xs text-surface-400 hover:text-surface-200 underline"
+										onclick={() => expandPipLogs = !expandPipLogs}
+									>{expandPipLogs ? 'hide details' : 'show details'}</button>
+									{#if expandPipLogs}
+										{#each group.lines as line}
+											<div class="pl-6 py-0.5 text-surface-400">{line}</div>
+										{/each}
+									{/if}
+								</div>
+							{:else}
+								{#each group.lines as line, li}
+									<div class="py-1 border-t border-surface-700 first:border-t-0">
+										<span class="text-surface-500 mr-2 select-none">{li + 1}</span>{line}
+									</div>
+								{/each}
+							{/if}
 						{/each}
 					{:else}
 						<p class="text-surface-500">No logs available yet.</p>
