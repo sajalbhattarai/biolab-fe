@@ -11,8 +11,16 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Build argument for API URL (used at build time)
+ARG VITE_PUBLIC_API_URL=""
+ENV VITE_PUBLIC_API_URL=$VITE_PUBLIC_API_URL
+
 # Build the app
 RUN npm run build
+
+# Environment variables for runtime
+ENV NODE_ENV=production
+ENV ORIGIN=http://localhost:3000
 
 # Expose port
 EXPOSE 3000
