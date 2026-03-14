@@ -1,10 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { setToken } from '$lib/auth.js';
-
-	const API_URL = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-		? 'http://localhost:8000'
-		: '';
+	import { API_URL } from '$lib/config';
 
 	let username = $state('');
 	let password = $state('');
