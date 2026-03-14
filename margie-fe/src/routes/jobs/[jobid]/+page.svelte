@@ -42,7 +42,7 @@
 
 	interface JobStatus {
 		job_id: string;
-		status: 'pending' | 'running' | 'snakemake' | 'completed' | 'failed';
+		status: 'pending' | 'running' | 'snakemake' | 'completed' | 'failed' | 'cancelled';
 		phase: string;
 		progress?: number;
 		steps_done?: number;
@@ -145,7 +145,7 @@
 			}
 
 			// Stop polling if job is done
-			if (job && (job.status === 'completed' || job.status === 'failed')) {
+			if (job && (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled')) {
 				// One final file fetch on completion
 				if (job.work_dir) {
 					fetchJobFiles(currentSubdir);
@@ -228,6 +228,7 @@
 			case 'running': return 'bg-blue-500 animate-pulse';
 			case 'snakemake': return 'bg-purple-500 animate-pulse';
 			case 'failed': return 'bg-red-500';
+			case 'cancelled': return 'bg-orange-500';
 			default: return 'bg-gray-400';
 		}
 	}
@@ -238,6 +239,7 @@
 			case 'running': return 'Running';
 			case 'snakemake': return 'Running Snakemake';
 			case 'failed': return 'Failed';
+			case 'cancelled': return 'Cancelled';
 			default: return 'Pending';
 		}
 	}
@@ -259,6 +261,27 @@
 	function formatTime(time?: string): string {
 		if (!time) return '-';
 		return new Date(time).toLocaleString();
+	}
+
+	async function cancelJob() {
+		if (!confirm('Are you sure you want to cancel this job? All running SLURM jobs and SSH processes will be terminated.')) {
+			return;
+		}
+		try {
+			const apiUrl = getApiUrl();
+			const res = await fetch(`${apiUrl}/v1/ssh/cancel_job/${jobId}`, {
+				method: 'POST',
+				headers: authHeaders()
+			});
+			if (res.status === 401) { handle401(); return; }
+			if (!res.ok) throw new Error('Failed to cancel job');
+			const data = await res.json();
+			console.log('Job cancelled:', data);
+			// Immediately refresh status
+			await fetchJobStatus();
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to cancel job';
+		}
 	}
 
 	$effect(() => {
@@ -293,9 +316,22 @@
 					<h2 class="text-xl font-semibold mb-1">Job ID</h2>
 					<code class="font-mono text-sm bg-surface-200 dark:bg-surface-700 px-2 py-1 rounded">{job.job_id}</code>
 				</div>
-				<div class="flex items-center gap-2">
-					<span class="inline-block w-3 h-3 rounded-full {getStatusColor(job.status)}"></span>
-					<span class="font-semibold">{getStatusText(job.status)}</span>
+				<div class="flex items-center gap-3">
+					<div class="flex items-center gap-2">
+						<span class="inline-block w-3 h-3 rounded-full {getStatusColor(job.status)}"></span>
+						<span class="font-semibold">{getStatusText(job.status)}</span>
+					</div>
+					{#if job.status === 'running' || job.status === 'pending' || job.status === 'snakemake'}
+						<button
+							type="button"
+							onclick={() => cancelJob()}
+							class="btn variant-filled-error px-3 py-1.5 text-sm font-semibold rounded flex items-center gap-1.5 hover:brightness-110 transition-all"
+							title="Cancel all running jobs"
+						>
+							<span>🛑</span>
+							<span>Emergency Stop</span>
+						</button>
+					{/if}
 				</div>
 			</div>
 
@@ -590,6 +626,10 @@
 		{:else if job.status === 'failed'}
 			<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
 				Analysis failed. Check the logs for details.
+			</div>
+		{:else if job.status === 'cancelled'}
+			<div class="bg-orange-100 border border-orange-400 text-orange-700 px-4 py-3 rounded">
+				Job was cancelled by user. All SLURM jobs have been terminated.
 			</div>
 		{:else}
 			<div class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded flex items-center gap-2">
