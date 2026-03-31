@@ -43,8 +43,8 @@
 			missing.push('main_database');
 		}
 
-		// Check compute.cluster-default.account
-		const account = formValues.compute?.['cluster-default']?.account;
+		// Check compute.cluster_default.account
+		const account = formValues.compute?.['cluster_default']?.account;
 		if (!account || account.trim() === '') {
 			missing.push('SLURM account');
 		}
@@ -157,9 +157,15 @@
 	// Group configurable params by section
 	function groupParamsBySection(workflows: any[]): Map<string, any[]> {
 		const sections = new Map<string, any[]>();
+		const seen = new Set<string>(); // Track params we've already added
 
 		workflows.forEach(workflow => {
 			workflow.configurable_params?.forEach((param: any) => {
+				// Skip if we've already added this parameter
+				if (seen.has(param.param)) {
+					return;
+				}
+
 				const parts = param.param.split('.');
 				const section = parts[0]; // e.g., "compute", "prodigal", "pfam"
 
@@ -167,6 +173,7 @@
 					sections.set(section, []);
 				}
 				sections.get(section)!.push(param);
+				seen.add(param.param); // Mark as seen
 			});
 		});
 
@@ -472,7 +479,7 @@
 					{@const sectionTitle = sectionName.charAt(0).toUpperCase() + sectionName.slice(1)}
 
 					{#if isCompute}
-						<!-- Special handling for compute.cluster-default -->
+						<!-- Special handling for compute.cluster_default -->
 						<ConfigSection
 							title="SLURM Configuration"
 							description="Configure cluster execution settings"
@@ -662,7 +669,7 @@ prodigal:
 					<div class="mt-3 text-xs text-surface-600 dark:text-surface-400 bg-surface-200 dark:bg-surface-700 rounded p-3 font-mono">
 						<pre>main_database: ~/.local/share/bioinformatics-tools/my-db.db
 compute:
-  cluster-default:
+  cluster_default:
     accounts: []
     max_cpus: 0
     queues: none</pre>
