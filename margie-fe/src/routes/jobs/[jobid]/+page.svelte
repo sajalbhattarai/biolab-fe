@@ -30,8 +30,10 @@
 		name: string;
 		version: string;
 		path: string;
-		source: 'cached' | 'downloaded';
-		docker_url: string;
+		resolved_path?: string;
+		source: 'local' | 'cached' | 'downloaded';
+		registry_url?: string;
+		docker_url?: string;
 	}
 
 	interface FileEntry {
@@ -96,6 +98,26 @@
 			}
 		}
 		return groups;
+	}
+
+	function containerSourceLabel(source: ContainerInfo['source']): string {
+		if (source === 'local') return 'Local';
+		if (source === 'cached') return 'Cached';
+		return 'Downloaded';
+	}
+
+	function containerSourceClass(source: ContainerInfo['source']): string {
+		if (source === 'local') return 'bg-amber-500/20 text-amber-500';
+		if (source === 'cached') return 'bg-green-500/20 text-green-500';
+		return 'bg-blue-500/20 text-blue-500';
+	}
+
+	function containerLocation(container: ContainerInfo): string {
+		if (container.source === 'local') {
+			return container.resolved_path ?? container.path;
+		}
+
+		return container.registry_url ?? container.docker_url ?? container.resolved_path ?? container.path;
 	}
 
 	let jobId = $derived($page.params.jobid);
@@ -456,7 +478,7 @@
 									<th class="px-4 py-3">Name</th>
 									<th class="px-4 py-3">Version</th>
 									<th class="px-4 py-3">Source</th>
-									<th class="px-4 py-3">Image</th>
+									<th class="px-4 py-3">Location / Image</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -465,11 +487,11 @@
 										<td class="px-4 py-3 font-mono">{c.name}</td>
 										<td class="px-4 py-3 font-mono">{c.version}</td>
 										<td class="px-4 py-3">
-											<span class="text-xs font-semibold px-2 py-1 rounded {c.source === 'cached' ? 'bg-green-500/20 text-green-500' : 'bg-blue-500/20 text-blue-500'}">
-												{c.source === 'cached' ? 'Cached' : 'Downloaded'}
+											<span class="text-xs font-semibold px-2 py-1 rounded {containerSourceClass(c.source)}">
+												{containerSourceLabel(c.source)}
 											</span>
 										</td>
-										<td class="px-4 py-3 font-mono text-xs text-surface-400">{c.docker_url}</td>
+										<td class="px-4 py-3 font-mono text-xs text-surface-400">{containerLocation(c)}</td>
 									</tr>
 								{/each}
 							</tbody>
