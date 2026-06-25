@@ -2,6 +2,8 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { authHeaders, clearToken } from '$lib/auth.js';
+	import ConfigField from '$lib/ConfigField.svelte';
+	import { isWorkflowPathParam, getNestedValue, setNestedValue } from '$lib/configParams';
 
 	const API_URL = typeof window !== 'undefined' && window.location.hostname === 'localhost'
 		? 'http://localhost:8000'
@@ -14,7 +16,7 @@
 		label: string;
 		description: string;
 		full_description: string;
-		tools: Array<{name: string; purpose: string; version: string; output: string}>;
+		tools: Array<{key?: string; phase?: number; name: string; purpose: string; version: string; output: string}>;
 		configurable_params: Array<{param: string; default: any; description: string; type: string}>;
 		database_deps: string[];
 		docs_url: string | null;
@@ -29,21 +31,85 @@
 	let genomePath = $state('');
 	let outputDir = $state('');
 	let homeDir = $state('');
-	let selectedWorkflow = $state('margie');
+	let selectedWorkflow = $state('margie_sb');
+	let userConfig = $state<Record<string, any>>({});
 	let availableWorkflows = $state<WorkflowDetails[]>([]);
-	let selectedWorkflowDetails = $state<WorkflowDetails | null>(null);
-	let showWorkflowModal = $state(false);
 	let loading = $state(false);
 	let quickLoading = $state(false);
 	let freshLoading = $state(false);
-	let showQuickInfo = $state(false);
-	let showFreshInfo = $state(false);
 	let error = $state('');
+	let selectedTools = $state<Set<string>>(new Set());
+	let savingPathSettings = $state(false);
+	let pathSettingsSaved = $state(false);
+	// Kept in sync with profile/+page.svelte's REQUIRED_TOOL_KEYS -- see its
+	// comment for why gtdbtk isn't required here even though rasttk is.
+	const REQUIRED_TOOL_KEYS = new Set(['rasttk']);
 
 	// Live preview of the full output path (timestamp is illustrative — generated server-side)
 	let outputPreview = $derived(
 		`${(outputDir.trim() || homeDir || '~').replace(/\/$/, '')}/YYYY-MM-DD-HHMM`
 	);
+
+	// The currently-selected workflow's tools that carry a phase/key (i.e.
+	// support per-tool selection at all), kept in a stable order for the grid.
+	let selectableTools = $derived(
+		(availableWorkflows.find(w => w.id === selectedWorkflow)?.tools ?? [])
+			.filter((t): t is {key: string; phase: number; name: string; purpose: string; version: string; output: string} =>
+				!!t.key && t.phase !== undefined)
+	);
+	let toolsByPhase = $derived.by(() => {
+		const groups = new Map<number, typeof selectableTools>();
+		for (const tool of selectableTools) {
+			if (!groups.has(tool.phase)) groups.set(tool.phase, []);
+			groups.get(tool.phase)!.push(tool);
+		}
+		return [...groups.entries()].sort((a, b) => a[0] - b[0]);
+	});
+	let requiredToolKeys = $derived(
+		selectableTools.filter(t => REQUIRED_TOOL_KEYS.has(t.key)).map(t => t.key)
+	);
+
+	function enforceRequiredTools(tools: Set<string>) {
+		const next = new Set(tools);
+		for (const key of requiredToolKeys) next.add(key);
+		return next;
+	}
+
+	// sif_path/db_root for the selected workflow -- input_path/output_path are
+	// the same underlying params but already have their own dedicated Genome
+	// Path / Output Directory cards below, so they're excluded here.
+	let selectedWorkflowPathParams = $derived(
+		(availableWorkflows.find(w => w.id === selectedWorkflow)?.configurable_params ?? [])
+			.filter(p => isWorkflowPathParam(p.param) && !p.param.endsWith('.input_path') && !p.param.endsWith('.output_path'))
+	);
+
+	function updateWorkflowPathValue(param: string, value: any) {
+		setNestedValue(userConfig, param.split('.'), value);
+		userConfig = { ...userConfig };
+	}
+
+	async function savePathSettings() {
+		savingPathSettings = true;
+		pathSettingsSaved = false;
+		try {
+			const configToSave = JSON.parse(JSON.stringify(userConfig));
+			const response = await fetch(`${API_URL}/v1/ssh/config`, {
+				method: 'PUT',
+				headers: authHeaders(),
+				body: JSON.stringify(configToSave),
+			});
+			if (response.status === 401) { handle401(); return; }
+			if (!response.ok) throw new Error('Failed to save workflow paths');
+
+			userConfig = configToSave;
+			pathSettingsSaved = true;
+			setTimeout(() => pathSettingsSaved = false, 2000);
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to save workflow paths';
+		} finally {
+			savingPathSettings = false;
+		}
+	}
 
 	onMount(async () => {
 		// Fetch home_dir for the placeholder
@@ -53,13 +119,10 @@
 			if (res.ok) homeDir = (await res.json()).home_dir;
 		} catch {}
 
-		// Populate output_dir default from remote config if the user has set one
+		// Fetch saved config so we can autofill this workflow's saved input/output paths
 		try {
 			const res = await fetch(`${API_URL}/v1/ssh/config`, { headers: authHeaders() });
-			if (res.ok) {
-				const config = await res.json();
-				if (config?.base_output_dir) outputDir = config.base_output_dir;
-			}
+			if (res.ok) userConfig = await res.json();
 		} catch {}
 
 		// Load available workflows
@@ -74,47 +137,45 @@
 		} catch {}
 	});
 
-	async function runWorkflow(endpoint: string, setLoading: (v: boolean) => void) {
-		try {
-			setLoading(true);
-			error = '';
-			const response = await fetch(`${API_URL}/v1/workflows/${endpoint}`, {
-				method: 'POST',
-				headers: authHeaders(),
-			});
-			if (response.status === 401) { handle401(); return; }
-			if (!response.ok) throw new Error(`Failed to run ${endpoint}`);
-			const data = await response.json();
-			console.log(`${endpoint} result:`, data);
+	// Autofill Genome Path / Output Directory from the selected workflow's saved
+	// defaults (set in Profile > Workflow Specific Settings) whenever the
+	// workflow selection changes. Re-runs automatically once userConfig loads.
+	$effect(() => {
+		const wfConfig = userConfig[selectedWorkflow];
+		genomePath = wfConfig?.input_path || '';
+		outputDir = wfConfig?.output_path || '';
+	});
 
-			if (data.job_id) {
-				goto(`/jobs/${data.job_id}`);
-			}
-		} catch (e) {
-			error = e instanceof Error ? e.message : `Failed to run ${endpoint}`;
-		} finally {
-			setLoading(false);
-		}
-	}
+	let selectedForRun = $derived(enforceRequiredTools(selectedTools));
 
-	function showWorkflowInfo(workflow: WorkflowDetails) {
-		selectedWorkflowDetails = workflow;
-		showWorkflowModal = true;
-	}
+	$effect(() => {
+		const saved: string | undefined = userConfig[selectedWorkflow]?.default_selected_tools;
+		const nextSelection = saved
+			? new Set(saved.split(',').map(k => k.trim()).filter(Boolean))
+			: new Set(
+				selectableTools
+					.filter(t => t.phase !== undefined && t.phase <= 9)
+					.map(t => t.key)
+				);
 
-	function closeWorkflowModal() {
-		showWorkflowModal = false;
-	}
+		selectedTools = enforceRequiredTools(nextSelection);
+	});
 
 	async function handleAnalyze() {
-		if (!genomePath.trim()) {
-			error = 'Please provide a genome file';
+		if (selectableTools.length > 0 && selectedForRun.size === 0) {
+			error = 'Select at least one tool to run, or check them all to run the full pipeline.';
 			return;
 		}
 
 		try {
 			loading = true;
 			error = '';
+
+			// Omit selected_tools entirely when every selectable tool is checked
+			// (the common case) -- functionally identical to sending the full
+			// list, but keeps the request payload matching the "run everything"
+			// default the backend already understands.
+			const allSelected = selectedForRun.size === selectableTools.length;
 
 			const response = await fetch(`${API_URL}/v1/ssh/run_workflow`, {
 				method: 'POST',
@@ -123,6 +184,7 @@
 					genome_path: genomePath,
 					output_dir: outputDir,
 					workflow: selectedWorkflow,
+					selected_tools: allSelected ? null : Array.from(selectedForRun),
 				}),
 			});
 
@@ -147,7 +209,7 @@
 	}
 </script>
 
-<div class="container mx-auto p-8 max-w-4xl">
+<div class="w-full px-4 md:px-6 py-8">
 	<h1 class="text-4xl font-bold mb-8 text-center text-primary-500">Genome Analysis</h1>
 
 	{#if error}
@@ -159,62 +221,108 @@
 	<!-- Workflow Selection -->
 	{#if availableWorkflows.length > 0}
 	<div class="card p-6 bg-surface-100 dark:bg-surface-800 mb-8">
-		<h2 class="text-2xl font-semibold mb-4">Workflow</h2>
+		<h2 class="text-2xl font-semibold">Workflow</h2>
+		<p class="text-sm text-surface-500 dark:text-surface-400 mb-4">
+			Choose the workflow you want to run. The selected workflow controls which tools, dependencies, and workflow-specific configuration fields are available on this page.
+		</p>
 		<div class="flex flex-wrap gap-3">
 			{#each availableWorkflows as wf}
-				<div class="relative">
-					<button
-						type="button"
-						onclick={() => selectedWorkflow = wf.id}
-						class="flex flex-col items-start px-5 py-3 pr-12 rounded-lg border-2 text-left transition-colors
-							{selectedWorkflow === wf.id
-								? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
-								: 'border-surface-300 dark:border-surface-600 hover:border-surface-400 dark:hover:border-surface-500'}"
-					>
-						<span class="font-semibold">{wf.label}</span>
-						<span class="text-xs text-surface-500 dark:text-surface-400 mt-0.5">{wf.description}</span>
-					</button>
-					<button
-						type="button"
-						onclick={() => showWorkflowInfo(wf)}
-						class="absolute top-3 right-3 btn-icon size-6 rounded-full bg-surface-200 dark:bg-surface-700 hover:bg-surface-300 dark:hover:bg-surface-600 text-surface-600 dark:text-surface-300 text-sm font-bold transition-colors"
-						aria-label={`More info about ${wf.label}`}
-						title={`Learn more about ${wf.label}`}
-					>?</button>
-				</div>
+				<button
+					type="button"
+					onclick={() => selectedWorkflow = wf.id}
+					class="flex flex-col items-start px-5 py-3 rounded-lg border-2 text-left transition-colors max-w-xs
+						{selectedWorkflow === wf.id
+							? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+							: 'border-surface-300 dark:border-surface-600 hover:border-surface-400 dark:hover:border-surface-500'}"
+				>
+					<span class="font-semibold">{wf.label}</span>
+					{#if wf.description}
+						<span class="text-xs text-surface-500 dark:text-surface-400 mt-1">{wf.description}</span>
+					{/if}
+				</button>
 			{/each}
 		</div>
 	</div>
 	{/if}
 
+	<!-- Tool Selection -->
+	<!-- Tool defaults are managed in Profile > Workflow Specific Settings. -->
+
 	<!-- Genome Path -->
 	<div class="card p-6 bg-surface-100 dark:bg-surface-800 mb-8">
-		<h2 class="text-2xl font-semibold mb-4">Genome Path</h2>
+		<h2 class="text-2xl font-semibold">Genome Path</h2>
+		<p class="text-sm text-surface-500 dark:text-surface-400 mb-4">
+			Enter the genome file you want to analyze, or a folder of genomes if the selected workflow supports batch input.
+			If left blank, Analyze will use your saved input_path default for this workflow from Profile.
+		</p>
 		<input
 			type="text"
 			bind:value={genomePath}
-			placeholder="Enter genome file path..."
+			placeholder={selectedWorkflow === 'margie_sb'
+				? 'Enter a genome file or a folder of genomes...'
+				: 'Enter genome file path...'}
 			class="w-full px-4 py-2 rounded border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-900"
 		/>
 	</div>
 
 	<!-- Output Directory -->
 	<div class="card p-6 bg-surface-100 dark:bg-surface-800 mb-8">
-		<h2 class="text-2xl font-semibold mb-4">Output Directory</h2>
+		<h2 class="text-2xl font-semibold">Output Directory</h2>
+		<p class="text-sm text-surface-500 dark:text-surface-400 mb-4">
+			This is the base folder where results will be written. Analyze appends a timestamp automatically so each run lands in its own folder.
+			If left blank, Analyze uses your home directory, or your saved output_path default for this workflow.
+		</p>
 		<input
 			type="text"
 			bind:value={outputDir}
 			placeholder={homeDir || 'Loading...'}
 			class="w-full px-4 py-2 rounded border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-900"
 		/>
-		<p class="text-sm text-surface-500 mt-2">
-			A timestamp is appended automatically. Results will go to:
-			<code class="font-mono text-xs bg-surface-200 dark:bg-surface-700 px-1 py-0.5 rounded ml-1">{outputPreview}</code>
-		</p>
-		<p class="text-xs text-surface-400 mt-1">
-			Leave blank to use your home directory. Set <code class="font-mono">base_output_dir</code> in your config to save this as a default.
-		</p>
+		<div class="mt-2 text-xs text-surface-400">
+			<code class="font-mono text-xs bg-surface-200 dark:bg-surface-700 px-1 py-0.5 rounded">{outputPreview}</code>
+		</div>
 	</div>
+
+	<!-- Workflow Paths (sif_path / db_root) -->
+	{#if selectedWorkflowPathParams.length > 0}
+	<details class="mb-8 group">
+		<summary class="card p-4 bg-surface-100 dark:bg-surface-800 cursor-pointer list-none">
+			<div class="flex items-center justify-between">
+				<div>
+					<h2 class="text-2xl font-semibold">Workflow Paths</h2>
+					<p class="text-xs text-surface-500 dark:text-surface-400 mt-1">
+						These are advanced path overrides for the selected workflow, such as container roots or database roots.
+						You usually do not need to change these unless you are pointing the workflow at a custom installation or a non-default database location.
+					</p>
+				</div>
+				<span class="text-xs text-surface-500 group-open:hidden">Expand</span>
+				<span class="text-xs text-surface-500 hidden group-open:inline">Collapse</span>
+			</div>
+		</summary>
+		<div class="card p-6 bg-surface-100 dark:bg-surface-800 mt-2">
+			<div class="flex items-center justify-between mb-4">
+				<button type="button" onclick={savePathSettings} disabled={savingPathSettings}
+					class="text-xs px-3 py-1 rounded font-semibold bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50">
+					{savingPathSettings ? 'Saving...' : pathSettingsSaved ? 'Saved!' : 'Save'}
+				</button>
+			</div>
+			<div class="space-y-2">
+				{#each selectedWorkflowPathParams as param}
+					{@const value = getNestedValue(userConfig, param.param.split('.'))}
+					<ConfigField
+						param={param.param}
+						type={param.type}
+						description={param.description}
+						default={param.default}
+						required={false}
+						value={value}
+						onchange={(newVal) => updateWorkflowPathValue(param.param, newVal)}
+					/>
+				{/each}
+			</div>
+		</div>
+	</details>
+	{/if}
 
 	<!-- Analyze Button -->
 	<div class="card p-6 bg-surface-100 dark:bg-surface-800">
@@ -229,200 +337,59 @@
 	</div>
 
 	<!-- Divider -->
-	<div class="flex items-center gap-4 mt-8">
-		<div class="flex-1 border-t border-surface-300 dark:border-surface-600"></div>
-		<span class="text-sm text-surface-400 dark:text-surface-500 font-medium uppercase tracking-widest">Sanity Checks</span>
-		<div class="flex-1 border-t border-surface-300 dark:border-surface-600"></div>
-	</div>
-
-	<!-- Test Workflows -->
-	<div class="card p-6 bg-surface-100 dark:bg-surface-800 mt-4">
-		<h2 class="text-2xl font-semibold mb-1">Test Workflows</h2>
-		<p class="text-sm text-surface-500 mb-6">You can run these before submitting real jobs to verify SSH, Snakemake, and the pipeline are all working correctly.</p>
-
-		<div class="flex flex-wrap gap-4">
-			<!-- Quick Example -->
-			<div class="flex flex-col gap-2">
-				<div class="flex items-center gap-2">
-					<button
-						type="button"
-						onclick={() => runWorkflow('run_quick_example', (v) => quickLoading = v)}
-						disabled={quickLoading}
-						class="btn px-6 py-2 text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
-					>
-						{quickLoading ? 'Running...' : 'Quick Example'}
-					</button>
-					<button
-						type="button"
-						onclick={() => showQuickInfo = !showQuickInfo}
-						class="btn-icon size-7 rounded-full border border-surface-400 dark:border-surface-500 text-surface-500 hover:bg-surface-200 dark:hover:bg-surface-700 text-sm font-bold transition-colors"
-						aria-label="More info about Quick Example"
-					>?</button>
+	<details class="mt-8 group">
+		<summary class="card p-4 bg-surface-100 dark:bg-surface-800 cursor-pointer list-none">
+			<div class="flex items-center justify-between">
+				<div>
+					<h2 class="text-2xl font-semibold">Sanity Checks</h2>
+					<p class="text-xs text-surface-500 dark:text-surface-400 mt-1">
+						Use the built-in test workflows to verify SSH access, Snakemake execution, and the pipeline wiring before you launch a real job.
+						Quick Example is a lightweight test that can cache hit. Fresh Test always forces a clean run in a temporary directory.
+					</p>
 				</div>
-				{#if showQuickInfo}
-					<div class="text-xs text-surface-600 dark:text-surface-300 bg-surface-200 dark:bg-surface-700 rounded-lg p-3 max-w-xs">
-						Runs a lightweight end-to-end test over SSH — touches Snakemake and the DB cache pipeline without spinning up containers. If you've run it before, it will likely <span class="font-semibold text-emerald-600 dark:text-emerald-400">cache hit</span> and finish almost instantly.
-					</div>
-				{/if}
+				<span class="text-xs text-surface-500 group-open:hidden">Expand</span>
+				<span class="text-xs text-surface-500 hidden group-open:inline">Collapse</span>
+			</div>
+		</summary>
+
+		<!-- Test Workflows -->
+		<div class="card p-6 bg-surface-100 dark:bg-surface-800 mt-2">
+			<h2 class="text-2xl font-semibold mb-6">Test Workflows</h2>
+
+			<div class="flex flex-wrap gap-4">
+			<!-- Quick Example -->
+			<div class="flex flex-col gap-2 max-w-xs">
+				<button
+					type="button"
+					onclick={() => runWorkflow('run_quick_example', (v) => quickLoading = v)}
+					disabled={quickLoading}
+					class="btn px-6 py-2 text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
+				>
+					{quickLoading ? 'Running...' : 'Quick Example'}
+				</button>
+				<p class="text-xs text-surface-500 dark:text-surface-400">
+					Runs a lightweight end-to-end test over SSH. It touches Snakemake and the DB cache pipeline without spinning up containers.
+					If you have run it before, it will often cache hit and finish almost instantly.
+				</p>
 			</div>
 
 			<!-- Fresh Test -->
-			<div class="flex flex-col gap-2">
-				<div class="flex items-center gap-2">
-					<button
-						type="button"
-						onclick={() => runWorkflow('run_fresh_test', (v) => freshLoading = v)}
-						disabled={freshLoading}
-						class="btn px-6 py-2 text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50"
-					>
-						{freshLoading ? 'Running...' : 'Fresh Test'}
-					</button>
-					<button
-						type="button"
-						onclick={() => showFreshInfo = !showFreshInfo}
-						class="btn-icon size-7 rounded-full border border-surface-400 dark:border-surface-500 text-surface-500 hover:bg-surface-200 dark:hover:bg-surface-700 text-sm font-bold transition-colors"
-						aria-label="More info about Fresh Test"
-					>?</button>
-				</div>
-				{#if showFreshInfo}
-					<div class="text-xs text-surface-600 dark:text-surface-300 bg-surface-200 dark:bg-surface-700 rounded-lg p-3 max-w-xs">
-						Always writes to a temporary directory and <span class="font-semibold text-amber-600 dark:text-amber-400">bypasses the cache</span>, so you get a true fresh run every time. Use this when you want to verify the full pipeline works end-to-end without relying on any prior state.
-					</div>
-				{/if}
+			<div class="flex flex-col gap-2 max-w-xs">
+				<button
+					type="button"
+					onclick={() => runWorkflow('run_fresh_test', (v) => freshLoading = v)}
+					disabled={freshLoading}
+					class="btn px-6 py-2 text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50"
+				>
+					{freshLoading ? 'Running...' : 'Fresh Test'}
+				</button>
+				<p class="text-xs text-surface-500 dark:text-surface-400">
+					Always writes to a temporary directory and bypasses the cache, so you get a true fresh run every time.
+					Use this when you want to verify the full pipeline works end-to-end without relying on any prior state.
+				</p>
 			</div>
 		</div>
-	</div>
+		</div>
+	</details>
 </div>
 
-<!-- Workflow Details Modal -->
-{#if showWorkflowModal && selectedWorkflowDetails}
-	<div
-		class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-		onclick={closeWorkflowModal}
-		role="button"
-		tabindex="-1"
-		onkeydown={(e) => e.key === 'Escape' && closeWorkflowModal()}
-	>
-		<div
-			class="bg-surface-100 dark:bg-surface-800 rounded-lg shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
-			onclick={(e) => e.stopPropagation()}
-			role="dialog"
-			tabindex="-1"
-		>
-			<!-- Header -->
-			<div class="sticky top-0 bg-surface-100 dark:bg-surface-800 border-b border-surface-300 dark:border-surface-600 px-6 py-4 flex justify-between items-center">
-				<h2 class="text-2xl font-bold text-primary-500">{selectedWorkflowDetails.label}</h2>
-				<button
-					type="button"
-					onclick={closeWorkflowModal}
-					class="btn-icon size-8 rounded-full hover:bg-surface-200 dark:hover:bg-surface-700 text-xl"
-					aria-label="Close"
-				>&times;</button>
-			</div>
-
-			<!-- Content -->
-			<div class="px-6 py-4 space-y-6">
-				<!-- Description -->
-				<div>
-					<h3 class="text-lg font-semibold mb-2 text-secondary-500">Description</h3>
-					<p class="text-surface-700 dark:text-surface-300">{selectedWorkflowDetails.full_description || selectedWorkflowDetails.description}</p>
-				</div>
-
-				<!-- Tools -->
-				{#if selectedWorkflowDetails.tools && selectedWorkflowDetails.tools.length > 0}
-					<div>
-						<h3 class="text-lg font-semibold mb-3 text-secondary-500">Tools & Programs</h3>
-						<div class="space-y-3">
-							{#each selectedWorkflowDetails.tools as tool}
-								<div class="bg-surface-200 dark:bg-surface-700 rounded-lg p-4">
-									<div class="flex items-center justify-between mb-1">
-										<span class="font-semibold text-primary-600 dark:text-primary-400">{tool.name}</span>
-										<span class="text-xs font-mono bg-surface-300 dark:bg-surface-600 px-2 py-0.5 rounded">v{tool.version}</span>
-									</div>
-									<p class="text-sm text-surface-600 dark:text-surface-400 mb-1">{tool.purpose}</p>
-									{#if tool.output}
-										<p class="text-xs text-surface-500 dark:text-surface-500">
-											<span class="font-semibold">Output:</span> {tool.output}
-										</p>
-									{/if}
-								</div>
-							{/each}
-						</div>
-					</div>
-				{/if}
-
-				<!-- Configurable Parameters -->
-				{#if selectedWorkflowDetails.configurable_params && selectedWorkflowDetails.configurable_params.length > 0}
-					<div>
-						<h3 class="text-lg font-semibold mb-3 text-secondary-500">Configurable Parameters</h3>
-						<div class="space-y-2">
-							{#each selectedWorkflowDetails.configurable_params as param}
-								<div class="bg-surface-200 dark:bg-surface-700 rounded p-3">
-									<div class="flex items-baseline gap-2 mb-1">
-										<code class="font-mono text-sm font-semibold text-primary-600 dark:text-primary-400">{param.param}</code>
-										<span class="text-xs text-surface-500">({param.type})</span>
-									</div>
-									<p class="text-sm text-surface-600 dark:text-surface-400 mb-1">{param.description}</p>
-									<p class="text-xs font-mono text-surface-500 dark:text-surface-500">
-										<span class="font-semibold">Default:</span> {param.default}
-									</p>
-								</div>
-							{/each}
-						</div>
-					</div>
-				{/if}
-
-				<!-- Database Dependencies -->
-				{#if selectedWorkflowDetails.database_deps && selectedWorkflowDetails.database_deps.length > 0}
-					<div>
-						<h3 class="text-lg font-semibold mb-2 text-secondary-500">Database Requirements</h3>
-						<ul class="list-disc list-inside space-y-1 text-surface-700 dark:text-surface-300">
-							{#each selectedWorkflowDetails.database_deps as dep}
-								<li>{dep}</li>
-							{/each}
-						</ul>
-					</div>
-				{/if}
-
-				<!-- Containers -->
-				{#if selectedWorkflowDetails.containers && selectedWorkflowDetails.containers.length > 0}
-					<div>
-						<h3 class="text-lg font-semibold mb-2 text-secondary-500">Containers</h3>
-						<div class="flex flex-wrap gap-2">
-							{#each selectedWorkflowDetails.containers as container}
-								<span class="inline-flex items-center gap-1 bg-surface-200 dark:bg-surface-700 px-3 py-1 rounded-full text-sm">
-									<span class="font-mono">{container.name}</span>
-									<span class="text-xs text-surface-500">({container.version})</span>
-								</span>
-							{/each}
-						</div>
-					</div>
-				{/if}
-
-				<!-- Documentation Link -->
-				{#if selectedWorkflowDetails.docs_url}
-					<div>
-						<a
-							href={selectedWorkflowDetails.docs_url}
-							target="_blank"
-							rel="noopener noreferrer"
-							class="inline-flex items-center gap-2 text-primary-500 hover:text-primary-700 font-semibold"
-						>
-							<span>View Documentation</span>
-							<span class="text-xs">↗</span>
-						</a>
-					</div>
-				{/if}
-			</div>
-
-			<!-- Footer -->
-			<div class="sticky bottom-0 bg-surface-100 dark:bg-surface-800 border-t border-surface-300 dark:border-surface-600 px-6 py-4 flex justify-end">
-				<button
-					type="button"
-					onclick={closeWorkflowModal}
-					class="btn variant-filled-primary px-6 py-2"
-				>Close</button>
-			</div>
-		</div>
-	</div>
-{/if}

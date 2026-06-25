@@ -19,5 +19,9 @@
 </script>
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
-<Navibar />
-{@render children()}
+<div class="app-shell">
+	<Navibar />
+	<main class="app-content app-page-frame">
+		{@render children()}
+	</main>
+</div>

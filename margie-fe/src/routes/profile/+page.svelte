@@ -2,8 +2,8 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { authHeaders, clearToken } from '$lib/auth.js';
-	import ConfigSection from '$lib/ConfigSection.svelte';
 	import ConfigField from '$lib/ConfigField.svelte';
+	import { isWorkflowPathParam, getNestedValue, setNestedValue } from '$lib/configParams';
 
 	const API_URL = typeof window !== 'undefined' && window.location.hostname === 'localhost'
 		? 'http://localhost:8000'
@@ -18,12 +18,23 @@
 	let creatingConfig = $state(false);
 	let testingPath = $state(false);
 	let pathTestResult = $state<{writable: boolean; error?: string} | null>(null);
+	let selectedWorkflowPathId = $state('');
+	let selectedToolKeys = $state<Set<string>>(new Set());
 	let error = $state('');
 	let success = $state('');
 	let credentialsError = $state('');
 	let credentialsSuccess = $state('');
 	let connected = $state(false);
 	let checking = $state(true);
+	// rasttk is the only true hard dependency: its rule always needs
+	// GTDB-Tk's real classification (domain + genetic code) as an input
+	// regardless of any flag. gtdbtk itself only controls whether that
+	// classification also gets loaded into the database (margie_sb.smk's
+	// run_rasttk docstring + rasttk_all's run_gtdbtk-gated input) -- the
+	// underlying GTDB-Tk computation always runs either way, so it's safe
+	// to let users deselect it independently.
+	const REQUIRED_TOOL_KEYS = new Set(['rasttk']);
+	const DEFAULT_ON_MAX_PHASE = 9;
 
 	// Cluster credentials form
 	let editClusterHost = $state('');
@@ -154,35 +165,50 @@
 		}
 	}
 
-	// Group configurable params by section
-	function groupParamsBySection(workflows: any[]): Map<string, any[]> {
-		const sections = new Map<string, any[]>();
-		const seen = new Set<string>(); // Track params we've already added
-
-		workflows.forEach(workflow => {
-			workflow.configurable_params?.forEach((param: any) => {
-				// Skip if we've already added this parameter
-				if (seen.has(param.param)) {
-					return;
-				}
-
-				const parts = param.param.split('.');
-				const section = parts[0]; // e.g., "compute", "prodigal", "pfam"
-
-				if (!sections.has(section)) {
-					sections.set(section, []);
-				}
-				sections.get(section)!.push(param);
-				seen.add(param.param); // Mark as seen
-			});
-		});
-
-		return sections;
+	// Per-workflow root-path settings, grouped by workflow, for the
+	// "Workflow Specific Settings" section.
+	function getWorkflowPathSettings(workflows: any[]): Array<{ id: string; label: string; params: any[] }> {
+		return workflows
+			.map(workflow => ({
+				id: workflow.id,
+				label: workflow.label,
+				params: (workflow.configurable_params || []).filter((p: any) => isWorkflowPathParam(p.param)),
+			}))
+			.filter(entry => entry.params.length > 0);
 	}
 
-	// Build config to save - syncs YAML to exactly match what user sees in UI
+	let workflowPathSettings = $derived(getWorkflowPathSettings(workflows));
+	let selectedWorkflowPathSettings = $derived(
+		workflowPathSettings.find(entry => entry.id === selectedWorkflowPathId) ?? workflowPathSettings[0] ?? null
+	);
+	let selectedWorkflowDetails = $derived(
+		workflows.find(workflow => workflow.id === selectedWorkflowPathId) ?? null
+	);
+	let selectableTools = $derived(
+		(selectedWorkflowDetails?.tools ?? [])
+			.filter((tool): tool is {key: string; phase: number; name: string; purpose: string; version: string; output: string} =>
+				!!tool.key && tool.phase !== undefined)
+	);
+	let requiredToolKeys = $derived(
+		selectableTools.filter(tool => REQUIRED_TOOL_KEYS.has(tool.key)).map(tool => tool.key)
+	);
+	let slurmParams = $derived.by(() => {
+		const params = workflows.flatMap(wf => wf.configurable_params || []).filter((param: any) => param.param.startsWith('compute.'));
+		const unique = new Map<string, any>();
+		for (const param of params) {
+			if (!unique.has(param.param)) unique.set(param.param, param);
+		}
+		return [...unique.values()];
+	});
+
+	// Build config to save - syncs YAML to match what's shown in the UI, while
+	// PRESERVING any existing keys the UI doesn't know about (e.g. top-level
+	// legacy paths like sif_path/db_root/base_input_dir that predate the
+	// namespaced margie_sb.* convention). Without this, saving anything here
+	// would silently drop those keys on the next write, since the PUT
+	// endpoint overwrites the whole file rather than merging.
 	function buildConfigToSave(): Record<string, any> {
-		const configToSave: Record<string, any> = {};
+		const configToSave: Record<string, any> = JSON.parse(JSON.stringify(config));
 		const allParams = workflows.flatMap(wf => wf.configurable_params || []);
 
 		// Write ALL parameters to YAML - what you see is what you get
@@ -205,20 +231,12 @@
 		const mainDb = formValues.main_database?.trim();
 		configToSave.main_database = mainDb || '~/.local/share/bioinformatics-tools/my-db.db';
 
+		if (selectedWorkflowPathId) {
+			if (!configToSave[selectedWorkflowPathId]) configToSave[selectedWorkflowPathId] = {};
+			configToSave[selectedWorkflowPathId].default_selected_tools = Array.from(selectedToolKeys).join(',');
+		}
+
 		return configToSave;
-	}
-
-	function getNestedValue(obj: any, path: string[]): any {
-		return path.reduce((current, key) => current?.[key], obj);
-	}
-
-	function setNestedValue(obj: any, path: string[], value: any) {
-		const lastKey = path[path.length - 1];
-		const parent = path.slice(0, -1).reduce((current, key) => {
-			if (!current[key]) current[key] = {};
-			return current[key];
-		}, obj);
-		parent[lastKey] = value;
 	}
 
 	function updateFormValue(param: string, value: any) {
@@ -226,6 +244,46 @@
 		setNestedValue(formValues, parts, value);
 		formValues = { ...formValues }; // Trigger reactivity
 	}
+
+	$effect(() => {
+		const firstWorkflowId = workflowPathSettings[0]?.id ?? '';
+		if (firstWorkflowId && !workflowPathSettings.some(entry => entry.id === selectedWorkflowPathId)) {
+			selectedWorkflowPathId = firstWorkflowId;
+		}
+	});
+
+	function enforceRequiredTools(tools: Set<string>) {
+		const next = new Set(tools);
+		for (const key of requiredToolKeys) next.add(key);
+		return next;
+	}
+
+	function toggleWorkflowTool(key: string) {
+		if (requiredToolKeys.includes(key)) return;
+		const next = new Set(selectedToolKeys);
+		if (next.has(key)) next.delete(key); else next.add(key);
+		selectedToolKeys = enforceRequiredTools(next);
+	}
+
+	function selectAllWorkflowTools() {
+		selectedToolKeys = enforceRequiredTools(new Set(selectableTools.map(tool => tool.key)));
+	}
+
+	function selectNoWorkflowTools() {
+		selectedToolKeys = enforceRequiredTools(new Set());
+	}
+
+	$effect(() => {
+		const saved: string | undefined = config[selectedWorkflowPathId]?.default_selected_tools;
+		if (saved) {
+			const savedKeys = new Set(saved.split(',').map(key => key.trim()).filter(Boolean));
+			selectedToolKeys = enforceRequiredTools(new Set(selectableTools.filter(tool => savedKeys.has(tool.key)).map(tool => tool.key)));
+		} else {
+			selectedToolKeys = enforceRequiredTools(new Set(
+				selectableTools.filter(tool => tool.phase <= DEFAULT_ON_MAX_PHASE).map(tool => tool.key)
+			));
+		}
+	});
 
 	async function saveConfig() {
 		saving = true;
@@ -374,7 +432,7 @@
 	}
 </script>
 
-<div class="container mx-auto p-8 max-w-4xl space-y-8">
+<div class="w-full px-4 md:px-6 py-8 space-y-8">
 	<section class="text-center py-8">
 		<h1 class="text-4xl font-bold text-primary-500 mb-4">Profile Settings</h1>
 		<p class="text-lg text-surface-600 dark:text-surface-300">
@@ -395,22 +453,27 @@
 	{/if}
 
 	<!-- SSH Connection Status -->
-	<section class="card p-6 bg-surface-100 dark:bg-surface-800">
-		<h2 class="text-2xl font-bold mb-4 text-primary-500">SSH Connection</h2>
+	<section class="card p-6 bg-surface-100 dark:bg-surface-800 w-full max-w-2xl">
+		<div class="mb-2 flex items-center gap-2">
+			<h2 class="text-2xl font-bold text-primary-500">SSH Connection</h2>
+		</div>
+		<p class="text-sm text-surface-500 mb-3">Checks whether the backend can reach your cluster using the saved credentials.</p>
 		{#if checking}
-			<p class="text-surface-500">Checking connection...</p>
+			<p class="text-sm text-surface-500">Checking connection...</p>
 		{:else if connected}
 			<div class="flex items-center gap-2">
-				<span class="inline-block w-3 h-3 rounded-full bg-green-500"></span>
-				<span class="text-green-700 dark:text-green-400 font-semibold">Connected to {user?.cluster_host}</span>
+				<span class="inline-block w-2.5 h-2.5 rounded-full bg-green-500"></span>
+				<span class="text-sm text-green-700 dark:text-green-400 font-semibold">Connected to {user?.cluster_host}</span>
 			</div>
 		{:else}
 			<div class="flex items-center gap-2">
-				<span class="inline-block w-3 h-3 rounded-full bg-red-500"></span>
-				<span class="text-red-700 dark:text-red-400 font-semibold">Could not connect to {user?.cluster_host}</span>
+				<span class="inline-block w-2.5 h-2.5 rounded-full bg-red-500"></span>
+				<span class="text-sm text-red-700 dark:text-red-400 font-semibold">Could not connect to {user?.cluster_host}</span>
 			</div>
-			<p class="text-sm text-surface-500 mt-2">Check that your cluster is reachable and your SSH key is still valid.</p>
-			<button type="button" onclick={checkConnection} class="btn variant-outline-primary mt-4 px-4 py-2 text-sm">
+			<div class="mt-2 text-sm text-surface-500 leading-snug">
+				Update cluster host, username, or SSH key under Cluster Credentials, then retry.
+			</div>
+			<button type="button" onclick={checkConnection} class="btn variant-outline-primary mt-3 px-4 py-2 text-sm">
 				Retry
 			</button>
 		{/if}
@@ -448,7 +511,11 @@
 		</section>
 	{:else if connected && Object.keys(config).length > 0}
 		<section class="card p-6 bg-surface-100 dark:bg-surface-800">
-			<h2 class="text-2xl font-bold mb-2 text-primary-500">CONFIG</h2>
+			<h2 class="text-2xl font-bold text-primary-500">CONFIG</h2>
+			<p class="text-sm text-surface-500 dark:text-surface-400 mb-4">
+				This section stores the global database and SLURM settings used by the backend.
+				Workflow-specific roots and tool defaults live below in Workflow Specific Settings.
+			</p>
 
 			<!-- Important Note -->
 			<div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
@@ -456,81 +523,34 @@
 					<span class="text-blue-600 dark:text-blue-400 text-xl font-bold">ℹ️</span>
 					<div>
 						<p class="text-sm text-blue-900 dark:text-blue-100 font-semibold mb-1">Database Configuration</p>
-						<p class="text-sm text-blue-800 dark:text-blue-200">
-							Make sure to set a <code class="font-mono bg-blue-100 dark:bg-blue-800 px-1 py-0.5 rounded">main_database</code> config key with the path to your database.
-							If not set, the database defaults to <code class="font-mono bg-blue-100 dark:bg-blue-800 px-1 py-0.5 rounded">~/.local/share/bioinformatics-tools/my-db.db</code>
+						<p class="text-xs text-blue-800 dark:text-blue-200">
+							Set the main_database key to the writable database path you want the backend to use.
+							If you leave it unset, the app falls back to ~/.local/share/bioinformatics-tools/my-db.db.
 						</p>
 					</div>
 				</div>
 			</div>
 
-			<!-- Structured Configuration Forms -->
-			<div class="space-y-4">
-				{#each [...groupParamsBySection(workflows)].sort((a, b) => {
-					// Sort: required sections first, then alphabetically
-					const aRequired = a[1].some(p => p.required);
-					const bRequired = b[1].some(p => p.required);
-					if (aRequired && !bRequired) return -1;
-					if (!aRequired && bRequired) return 1;
-					return a[0].localeCompare(b[0]);
-				}) as [sectionName, params]}
-					{@const hasRequired = params.some(p => p.required)}
-					{@const isCompute = sectionName === 'compute'}
-					{@const sectionTitle = sectionName.charAt(0).toUpperCase() + sectionName.slice(1)}
+			<h3 class="text-xl font-semibold mb-4 text-secondary-500">SLURM Configuration</h3>
+			<div class="grid gap-3 md:grid-cols-2">
+				{#each slurmParams as param}
+					{@const parts = param.param.split('.')}
+					{@const value = getNestedValue(formValues, parts)}
 
-					{#if isCompute}
-						<!-- Special handling for compute.cluster_default -->
-						<ConfigSection
-							title="SLURM Configuration"
-							description="Configure cluster execution settings"
-							required={hasRequired}
-							collapsible={false}
-							defaultExpanded={true}
-						>
-							{#each params as param}
-								{@const parts = param.param.split('.')}
-								{@const value = getNestedValue(formValues, parts)}
-
-								<ConfigField
-									param={param.param}
-									type={param.type}
-									description={param.description}
-									default={param.default}
-									required={param.required || false}
-									value={value}
-									onchange={(newVal) => updateFormValue(param.param, newVal)}
-								/>
-							{/each}
-						</ConfigSection>
-					{:else}
-						<!-- Tool-specific configuration sections -->
-						<ConfigSection
-							title={sectionTitle}
-							description="Configure {sectionTitle} execution parameters"
-							required={false}
-							collapsible={true}
-							defaultExpanded={false}
-						>
-							{#each params as param}
-								{@const parts = param.param.split('.')}
-								{@const value = getNestedValue(formValues, parts)}
-
-								<ConfigField
-									param={param.param}
-									type={param.type}
-									description={param.description}
-									default={param.default}
-									required={param.required || false}
-									value={value}
-									onchange={(newVal) => updateFormValue(param.param, newVal)}
-								/>
-							{/each}
-						</ConfigSection>
-					{/if}
+					<ConfigField
+						param={param.param}
+						type={param.type}
+						description={param.description}
+						default={param.default}
+						required={param.required || false}
+						compact={true}
+						value={value}
+						onchange={(newVal) => updateFormValue(param.param, newVal)}
+					/>
 				{/each}
 
 				<!-- Special handling for main_database -->
-				<div class="bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-300 dark:border-amber-700 rounded-lg p-5">
+				<div class="md:col-span-2 rounded-2xl border-2 border-amber-300 dark:border-amber-700 bg-gradient-to-br from-amber-50 to-surface-50 dark:from-amber-950/20 dark:to-surface-900/60 p-5 shadow-sm">
 					<div class="flex items-start gap-3 mb-3">
 						<span class="text-amber-600 dark:text-amber-400 text-xl font-bold">⚠️</span>
 						<div class="flex-1">
@@ -546,7 +566,7 @@
 							type="text"
 							bind:value={formValues.main_database}
 							oninput={() => pathTestResult = null}
-							class="input w-full px-4 py-2 rounded bg-white dark:bg-amber-900/40 border-2 border-amber-300 dark:border-amber-600 font-mono text-sm"
+							class="input w-full px-4 py-2 rounded-xl bg-white dark:bg-amber-900/40 border-2 border-amber-300 dark:border-amber-600 font-mono text-sm"
 							placeholder="~/.local/share/bioinformatics-tools/my-db.db"
 						/>
 
@@ -603,29 +623,14 @@
 					</summary>
 					<div class="mt-3 space-y-3 text-sm text-surface-700 dark:text-surface-300">
 						<div class="bg-surface-200 dark:bg-surface-700 rounded-lg p-4 space-y-3">
-							<h4 class="font-semibold text-primary-600 dark:text-primary-400">Hierarchical Config Pattern</h4>
+							<h4 class="font-semibold text-primary-600 dark:text-primary-400">Workflow-specific settings</h4>
 							<p>
-								Workflow rules follow a pattern where <code class="font-mono bg-surface-300 dark:bg-surface-600 px-1 py-0.5 rounded">run_&lt;tool&gt;</code>
-								reads from config key <code class="font-mono bg-surface-300 dark:bg-surface-600 px-1 py-0.5 rounded">&lt;tool&gt;:</code>
+								The workflow selector above is where you edit per-workflow container, database, input, and output paths.
+								Those values are stored separately for each workflow and reused automatically on Analyze.
 							</p>
-							<div class="bg-surface-100 dark:bg-surface-800 rounded p-3 font-mono text-xs">
-								<pre># Example: rule run_prodigal reads from:
-prodigal:
-  threads: 1        # CPU threads
-  mem_mb: 2048      # Memory in MB
-  runtime: 30       # Runtime limit (minutes)</pre>
-							</div>
-						</div>
-
-						<div class="bg-surface-200 dark:bg-surface-700 rounded-lg p-4 space-y-3">
-							<h4 class="font-semibold text-primary-600 dark:text-primary-400">Customizing Tool Parameters</h4>
-							<p>Each tool (prodigal, pfam, cog, dbcan, kofam) can be configured independently. Common parameters:</p>
-							<ul class="list-disc list-inside space-y-1 ml-2">
-								<li><code class="font-mono bg-surface-300 dark:bg-surface-600 px-1 py-0.5 rounded">threads</code> - Number of CPU threads</li>
-								<li><code class="font-mono bg-surface-300 dark:bg-surface-600 px-1 py-0.5 rounded">mem_mb</code> - Memory limit in MB</li>
-								<li><code class="font-mono bg-surface-300 dark:bg-surface-600 px-1 py-0.5 rounded">runtime</code> - Time limit in minutes</li>
-								<li><code class="font-mono bg-surface-300 dark:bg-surface-600 px-1 py-0.5 rounded">db</code> - Database path (tool-specific)</li>
-							</ul>
+							<p class="text-xs text-surface-500">
+								The lower config area is intentionally limited to SLURM and database settings; workflow-specific tool settings are no longer edited globally here.
+							</p>
 						</div>
 
 						<div class="bg-surface-200 dark:bg-surface-700 rounded-lg p-4 space-y-3">
@@ -647,6 +652,120 @@ prodigal:
 				</details>
 			</div>
 		</section>
+
+		{#if workflowPathSettings.length > 0}
+			<section class="card p-6 bg-surface-100 dark:bg-surface-800 mt-8">
+				<h2 class="text-2xl font-bold text-primary-500">Workflow Specific Settings</h2>
+				<p class="text-sm text-surface-500 dark:text-surface-400 mb-4">
+					Edit per-workflow roots and defaults in one place.
+					This section stays collapsed until you need it, but it is the source of truth for Analyze defaults.
+				</p>
+				<details class="group">
+					<summary class="cursor-pointer list-none rounded-2xl border border-primary-200/70 dark:border-primary-900/40 bg-gradient-to-br from-primary-50 to-surface-50 dark:from-primary-950/30 dark:to-surface-900/70 p-5 shadow-sm">
+						<div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-end">
+							<div class="text-xs font-semibold uppercase tracking-wide text-surface-500 group-open:hidden">Expand</div>
+							<div class="text-xs font-semibold uppercase tracking-wide text-surface-500 hidden group-open:block">Collapse</div>
+						</div>
+					</summary>
+
+					<div class="mt-4 rounded-xl border border-surface-200 dark:border-surface-700 bg-white/80 dark:bg-surface-800/80 p-4 space-y-4">
+						<div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+							<div>
+								<h3 class="text-lg font-semibold text-primary-600 dark:text-primary-400">
+									{selectedWorkflowPathSettings?.label}
+								</h3>
+								<p class="mt-1 text-xs text-surface-500">SIF/database roots and default input/output paths for this workflow.</p>
+							</div>
+							<div class="min-w-[16rem]">
+								<label class="block text-xs font-semibold uppercase tracking-wide text-surface-500 mb-2" for="workflow-path-picker">
+									Workflow
+								</label>
+								<select
+									id="workflow-path-picker"
+									bind:value={selectedWorkflowPathId}
+									class="input w-full rounded-lg bg-white dark:bg-surface-700 border border-surface-300 dark:border-surface-600 px-4 py-2"
+								>
+									{#each workflowPathSettings as wfSettings}
+										<option value={wfSettings.id}>{wfSettings.label}</option>
+									{/each}
+								</select>
+							</div>
+						</div>
+
+						{#if selectedWorkflowPathSettings}
+							<div class="space-y-1">
+								{#each selectedWorkflowPathSettings.params as param}
+									{@const parts = param.param.split('.')}
+									{@const value = getNestedValue(formValues, parts)}
+
+									<ConfigField
+										param={param.param}
+										type={param.type}
+										description={param.description}
+										default={param.default}
+										required={false}
+										value={value}
+										onchange={(newVal) => updateFormValue(param.param, newVal)}
+									/>
+								{/each}
+							</div>
+						{/if}
+
+						{#if selectableTools.length > 0}
+							<div class="rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-900/40 p-4 space-y-4">
+								<div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+									<div>
+										<h4 class="text-lg font-semibold text-secondary-500">Tool Defaults</h4>
+										<p class="text-xs text-surface-500 dark:text-surface-400 mt-1">
+											Pick the tools you want selected by default for this workflow on Analyze.
+											Required tools stay enabled, but the rest can be saved as your preferred starting point.
+										</p>
+									</div>
+									<div class="flex flex-wrap gap-2">
+										<button type="button" onclick={selectAllWorkflowTools} class="text-xs px-3 py-1 rounded border border-surface-300 dark:border-surface-600 hover:bg-surface-200 dark:hover:bg-surface-700">Select all</button>
+										<button type="button" onclick={selectNoWorkflowTools} class="text-xs px-3 py-1 rounded border border-surface-300 dark:border-surface-600 hover:bg-surface-200 dark:hover:bg-surface-700">Select none</button>
+									</div>
+								</div>
+								<div class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+									{#each selectableTools as tool}
+										{@const isRequired = requiredToolKeys.includes(tool.key)}
+										<label class="flex items-start gap-3 rounded-lg border border-surface-300 dark:border-surface-600 px-3 py-2 {isRequired ? 'bg-surface-200/60 dark:bg-surface-700/40 opacity-90' : 'cursor-pointer hover:bg-surface-200 dark:hover:bg-surface-700'}">
+											<input
+												type="checkbox"
+												checked={selectedToolKeys.has(tool.key)}
+												disabled={isRequired}
+												onchange={() => toggleWorkflowTool(tool.key)}
+												class="mt-1 accent-primary-500"
+											/>
+											<div class="min-w-0">
+												<div class="flex items-center gap-2">
+													<span class="text-sm font-semibold">{tool.name}</span>
+													{#if isRequired}
+														<span class="text-[10px] uppercase tracking-wide rounded-full bg-primary-500/15 text-primary-700 dark:text-primary-300 px-2 py-0.5">Required</span>
+													{/if}
+												</div>
+												<p class="mt-1 text-xs text-surface-500 leading-snug">{tool.purpose}</p>
+											</div>
+										</label>
+									{/each}
+								</div>
+							</div>
+						{/if}
+
+						<div class="flex justify-center pt-2">
+							<button
+								type="button"
+								onclick={saveConfig}
+								disabled={saving}
+								class="btn variant-filled-primary px-8 py-2"
+							>
+								{saving ? 'Saving...' : 'Save Workflow Settings'}
+							</button>
+						</div>
+					</div>
+				</details>
+			</section>
+		{/if}
 	{:else if connected}
 		<section class="card p-6 bg-surface-100 dark:bg-surface-800 text-center space-y-4">
 			<p class="text-surface-600 dark:text-surface-300 text-lg">No configuration found</p>
@@ -681,9 +800,10 @@ compute:
 
 	<!-- Cluster Credentials Section -->
 	<section class="card p-6 bg-surface-100 dark:bg-surface-800">
-		<h2 class="text-2xl font-bold mb-2 text-primary-500">Cluster Credentials</h2>
-		<p class="text-sm text-surface-500 mb-6">
-			Update your HPC cluster connection details. Changes will be validated before saving.
+		<h2 class="text-2xl font-bold text-primary-500">Cluster Credentials</h2>
+		<p class="text-sm text-surface-500 dark:text-surface-400 mb-4">
+			Update your HPC cluster connection details here.
+			The backend validates changes before saving them, so you can confirm the new host, username, and key are working.
 		</p>
 
 		{#if credentialsError}

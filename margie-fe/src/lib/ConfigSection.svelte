@@ -44,7 +44,7 @@
 		disabled={!collapsible}
 	>
 		<div class="flex-1">
-			<h3 class="text-lg font-semibold text-primary-600 dark:text-primary-400">
+			<h3 class="text-2xl font-semibold text-primary-600 dark:text-primary-400">
 				{title}
 				{#if required}
 					<span class="text-error-500 text-sm ml-1">(Required)</span>

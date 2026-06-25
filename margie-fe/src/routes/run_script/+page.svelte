@@ -50,13 +50,12 @@
 	}
 </script>
 
-<div class="container mx-auto p-8 max-w-2xl">
-	<h1 class="text-4xl font-bold mb-8 text-center text-primary-500">Run SLURM</h1>
-
-	<div class="bg-surface-200 dark:bg-surface-700 border-l-4 border-primary-500 p-4 rounded mb-6">
-		<p class="text-sm text-surface-600 dark:text-surface-300">
-			This will submit your script as a SLURM batch job on the remote cluster, equivalent to running
-			<code class="bg-surface-300 dark:bg-surface-600 px-1.5 py-0.5 rounded font-mono text-xs">$ sbatch script.sb</code>
+<div class="w-full px-4 md:px-6 py-8 max-w-none">
+	<div class="mb-8 text-center">
+		<h1 class="text-4xl font-bold text-primary-500">Run SLURM</h1>
+		<p class="text-sm text-surface-500 dark:text-surface-400 mt-2 max-w-2xl mx-auto">
+			Paste a SLURM script here and submit it to the remote cluster as a batch job.
+			The page sends the script as-is, similar to running a direct <code class="font-mono text-xs">sbatch</code> command on the cluster.
 		</p>
 	</div>
 
@@ -74,7 +73,7 @@
 	{/if}
 
 	<div class="card p-6 bg-surface-100 dark:bg-surface-800">
-		<form on:submit={handleSubmit} class="space-y-4">
+		<form onsubmit={handleSubmit} class="space-y-4">
 			<div>
 				<label for="script" class="block text-sm font-semibold mb-2">
 					Script Content

@@ -1,33 +1,26 @@
-<div class="container mx-auto p-8 max-w-4xl space-y-10">
+<script lang="ts">
+</script>
+
+<div class="w-full px-4 md:px-6 py-8 space-y-10">
 	<header class="text-center space-y-3">
 		<h1 class="text-4xl font-bold text-primary-500">Roadmap</h1>
-		<p class="text-lg text-surface-600 dark:text-surface-300">Why this platform exists and where it's going</p>
+		<p class="text-lg text-surface-600 dark:text-surface-300">A short overview of the platform's purpose, architecture, and next milestones.</p>
 	</header>
 
 	<!-- The Problem -->
 	<section class="space-y-4">
-		<h2 class="text-2xl font-bold border-b border-surface-300 dark:border-surface-600 pb-2">The Problem</h2>
-		<p class="text-surface-600 dark:text-surface-300 leading-relaxed">
-			Bioinformatics is full of powerful programs that are painful to actually use. Every tool has its own
-			environment, its own dependencies, its own database requirements, and its own quirks. Getting a single
-			program running on a cluster can take hours of debugging. Getting ten programs to run together in a
-			reproducible pipeline? That's a week of work before you analyze a single genome.
-		</p>
-		<p class="text-surface-600 dark:text-surface-300 leading-relaxed">
-			And then there's the redundancy problem. You annotate 500 genomes with Prodigal, then you annotate 500
-			more &mdash; but 200 of them overlap with your first batch. Without careful bookkeeping, you're burning
-			compute hours re-running analyses you already have results for.
-		</p>
+		<div class="border-b border-surface-300 dark:border-surface-600 pb-2">
+			<h2 class="text-2xl font-bold">The Problem</h2>
+		</div>
+		<p class="text-surface-600 dark:text-surface-300 leading-relaxed">Bioinformatics workflows are difficult to reproduce, expensive to rerun, and easy to duplicate by accident when you are processing many genomes at once.</p>
 	</section>
 
 	<!-- The Goal -->
 	<section class="space-y-4">
-		<h2 class="text-2xl font-bold border-b border-surface-300 dark:border-surface-600 pb-2">The Goal</h2>
-		<p class="text-surface-600 dark:text-surface-300 leading-relaxed">
-			The goal is simple: you should be able to say <em>"run 1,000 genomes through this pipeline"</em> and
-			walk away. The platform handles everything else &mdash; container management, database downloads, SLURM
-			job scheduling, memory and CPU allocation, output caching, and result storage.
-		</p>
+		<div class="border-b border-surface-300 dark:border-surface-600 pb-2">
+			<h2 class="text-2xl font-bold">The Goal</h2>
+		</div>
+		<p class="text-surface-600 dark:text-surface-300 leading-relaxed">The platform should let you launch large genome batches without manually juggling containers, databases, SLURM settings, or output bookkeeping.</p>
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
 			<div class="card p-5 bg-surface-100 dark:bg-surface-800">
 				<h3 class="font-semibold text-primary-500 mb-2">Containerize Once, Run Forever</h3>
@@ -68,7 +61,9 @@
 
 	<!-- How It Works -->
 	<section class="space-y-4">
-		<h2 class="text-2xl font-bold border-b border-surface-300 dark:border-surface-600 pb-2">How It Works</h2>
+		<div class="border-b border-surface-300 dark:border-surface-600 pb-2">
+			<h2 class="text-2xl font-bold">How It Works</h2>
+		</div>
 		<div class="space-y-3">
 			<div class="flex gap-4 items-start">
 				<span class="text-2xl font-bold text-primary-500 shrink-0">1.</span>
@@ -117,7 +112,9 @@
 
 	<!-- Development Roadmap -->
 	<section class="space-y-6">
-		<h2 class="text-2xl font-bold border-b border-surface-300 dark:border-surface-600 pb-2">Development Roadmap</h2>
+		<div class="border-b border-surface-300 dark:border-surface-600 pb-2">
+			<h2 class="text-2xl font-bold">Development Roadmap</h2>
+		</div>
 
 		<!-- Done -->
 		<div class="space-y-3">

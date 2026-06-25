@@ -24,6 +24,8 @@
 		rule: string;
 		status: string;
 		time: string;
+		genome?: string;
+		source?: string;
 	}
 
 	interface ContainerInfo {
@@ -49,14 +51,19 @@
 		progress?: number;
 		steps_done?: number;
 		steps_total?: number;
-		start_time?: string;
+		start_time: string;
 		end_time?: string;
 		genome_path?: string;
 		work_dir?: string;
-		cluster_host?: string;
+		workflow?: string;
+		selected_tools?: string;
+		relaunched_from?: string;
+		still_active?: boolean;
+		status_note?: string;
+		cluster_host: string;
 		sub_jobs: SubJob[];
-		slurm_jobs?: SlurmJob[];
-		containers?: ContainerInfo[];
+		slurm_jobs: SlurmJob[];
+		containers: ContainerInfo[];
 		logs?: string;
 	}
 
@@ -126,7 +133,10 @@
 	let loading = $state(true);
 	let pollInterval: ReturnType<typeof setInterval> | null = null;
 	let showLogs = $state(true);  // Show logs by default
-	let showContainers = $state(true);
+	let logsCopied = $state(false);
+	let showContainers = $state(false);
+	let showSlurmJobs = $state(true);
+	let showOutputFiles = $state(true);
 	let expandPipLogs = $state(false);
 	let logGroups = $derived(job?.logs ? processLogs(job.logs) : []);
 
@@ -226,6 +236,32 @@
 		}
 	}
 
+	const LARGE_FILE_WARN_BYTES = 100 * 1024 * 1024; // 100MB, easy to tune
+	let pendingLargeFile = $state<FileEntry | null>(null);
+
+	function isViewable(name: string): boolean {
+		const lower = name.toLowerCase();
+		return lower.endsWith('.tsv') || lower.endsWith('.csv');
+	}
+
+	function launchViewerTab(fileName: string) {
+		const relativePath = currentSubdir ? `${currentSubdir}/${fileName}` : fileName;
+		window.open(`/jobs/${jobId}/view?path=${encodeURIComponent(relativePath)}`, '_blank');
+	}
+
+	function openViewer(entry: FileEntry) {
+		if (entry.size && entry.size > LARGE_FILE_WARN_BYTES) {
+			pendingLargeFile = entry;
+			return;
+		}
+		launchViewerTab(entry.name);
+	}
+
+	function confirmViewLargeFile() {
+		if (pendingLargeFile) launchViewerTab(pendingLargeFile.name);
+		pendingLargeFile = null;
+	}
+
 	function navigateToDir(dirName: string) {
 		const newSubdir = currentSubdir ? `${currentSubdir}/${dirName}` : dirName;
 		fetchJobFiles(newSubdir);
@@ -285,6 +321,17 @@
 		return new Date(time).toLocaleString();
 	}
 
+	async function copyLogs() {
+		if (!job?.logs) return;
+		try {
+			await navigator.clipboard.writeText(job.logs);
+			logsCopied = true;
+			setTimeout(() => logsCopied = false, 1500);
+		} catch (e) {
+			console.error('Failed to copy logs:', e);
+		}
+	}
+
 	async function cancelJob() {
 		if (!confirm('Are you sure you want to cancel this job? All running SLURM jobs and SSH processes will be terminated.')) {
 			return;
@@ -306,6 +353,56 @@
 		}
 	}
 
+	let resumeInFlight = $state(false);
+	let restartInFlight = $state(false);
+	let relaunchedJobId = $state<string | null>(null);
+	let relaunchedAction = $state<'resumed' | 'restarted' | null>(null);
+
+	async function resumeFailedJob() {
+		resumeInFlight = true;
+		relaunchedJobId = null;
+		try {
+			const apiUrl = getApiUrl();
+			const res = await fetch(`${apiUrl}/v1/ssh/resume_job/${jobId}`, {
+				method: 'POST',
+				headers: authHeaders()
+			});
+			if (res.status === 401) { handle401(); return; }
+			if (!res.ok) throw new Error((await res.json()).detail ?? 'Failed to resume job');
+			const data = await res.json();
+			relaunchedJobId = data.job_id;
+			relaunchedAction = 'resumed';
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to resume job';
+		} finally {
+			resumeInFlight = false;
+		}
+	}
+
+	async function restartJob() {
+		if (!confirm('Restart this analysis from scratch with the same genome, workflow, and tool selection?')) {
+			return;
+		}
+		restartInFlight = true;
+		relaunchedJobId = null;
+		try {
+			const apiUrl = getApiUrl();
+			const res = await fetch(`${apiUrl}/v1/ssh/restart_job/${jobId}`, {
+				method: 'POST',
+				headers: authHeaders()
+			});
+			if (res.status === 401) { handle401(); return; }
+			if (!res.ok) throw new Error((await res.json()).detail ?? 'Failed to restart job');
+			const data = await res.json();
+			relaunchedJobId = data.job_id;
+			relaunchedAction = 'restarted';
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to restart job';
+		} finally {
+			restartInFlight = false;
+		}
+	}
+
 	$effect(() => {
 		// Refetch when jobId changes (only in browser)
 		if (typeof window !== 'undefined' && jobId) {
@@ -316,11 +413,32 @@
 
 </script>
 
-<div class="container mx-auto p-8 max-w-5xl space-y-6">
+<div class="w-full px-4 md:px-6 py-8 space-y-6">
 	<div class="flex items-center justify-between">
 		<h1 class="text-3xl font-bold text-primary-500">Job Monitor</h1>
-		<a href="/analyze" class="btn variant-ghost-surface px-4 py-2">New Analysis</a>
+		<div class="flex items-center gap-3">
+			{#if job}
+				<button
+					type="button"
+					onclick={restartJob}
+					disabled={restartInFlight}
+					class="btn variant-filled-secondary px-4 py-2"
+				>{restartInFlight ? 'Restarting...' : 'Restart This Analysis'}</button>
+			{/if}
+			<a href="/analyze" class="btn variant-ghost-surface px-4 py-2">New Analysis</a>
+		</div>
 	</div>
+
+	{#if relaunchedJobId}
+		<div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded flex items-center justify-between gap-3">
+			<span>
+				A new job has been started that {relaunchedAction === 'resumed' ? 'resumes' : 'restarts'} this one.
+				The new job ID is <span class="font-mono">{relaunchedJobId}</span> — visit the
+				<a href="/results/historical" class="underline font-semibold">jobs page</a> to monitor it.
+			</span>
+			<a href={`/jobs/${relaunchedJobId}`} class="btn variant-filled-primary btn-sm shrink-0">View New Job</a>
+		</div>
+	{/if}
 
 	{#if error}
 		<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">{error}</div>
@@ -430,32 +548,50 @@
 
 		<!-- Slurm Jobs -->
 		<section class="card p-6 bg-surface-100 dark:bg-surface-800">
-			<h2 class="text-xl font-semibold mb-4">Slurm Jobs</h2>
-			{#if (job.slurm_jobs ?? []).length > 0}
-				<div class="overflow-x-auto">
-					<table class="w-full text-sm text-left">
-						<thead class="text-xs uppercase text-surface-500 border-b border-surface-300 dark:border-surface-600">
-							<tr>
-								<th class="px-4 py-3">Job ID</th>
-								<th class="px-4 py-3">Rule</th>
-								<th class="px-4 py-3">Status</th>
-								<th class="px-4 py-3">Time</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each job.slurm_jobs ?? [] as sj}
-								<tr class="border-b border-surface-200 dark:border-surface-700">
-									<td class="px-4 py-3 font-mono">{sj.job_id}</td>
-									<td class="px-4 py-3 font-mono">{sj.rule ?? ''}</td>
-									<td class="px-4 py-3 font-semibold {getSlurmStatusColor(sj.status)}">{sj.status}</td>
-									<td class="px-4 py-3 font-mono">{sj.time}</td>
+			<button
+				type="button"
+				onclick={() => showSlurmJobs = !showSlurmJobs}
+				class="flex items-center justify-between w-full text-left"
+			>
+				<h2 class="text-xl font-semibold">Slurm Jobs</h2>
+				<span class="transform transition-transform {showSlurmJobs ? 'rotate-180' : ''}">&#9660;</span>
+			</button>
+			{#if showSlurmJobs}
+				<div>
+				{#if (job.slurm_jobs ?? []).length > 0}
+					<div
+						class="overflow-auto resize-y h-60 min-h-[120px] max-h-[80vh] rounded border border-surface-300 dark:border-surface-600 mt-4"
+					>
+						<table class="min-w-full text-sm text-left">
+							<thead class="text-xs uppercase text-surface-500 border-b border-surface-300 dark:border-surface-600 sticky top-0 bg-surface-100 dark:bg-surface-800">
+								<tr>
+									<th class="px-4 py-3 whitespace-nowrap">Job ID</th>
+									<th class="px-4 py-3 whitespace-nowrap">Rule</th>
+									<th class="px-4 py-3 whitespace-nowrap">Organism</th>
+									<th class="px-4 py-3 whitespace-nowrap">Status</th>
+									<th class="px-4 py-3 whitespace-nowrap">Source</th>
+									<th class="px-4 py-3 whitespace-nowrap">Time</th>
 								</tr>
-							{/each}
-						</tbody>
-					</table>
+							</thead>
+							<tbody>
+								{#each job.slurm_jobs ?? [] as sj}
+									<tr class="border-b border-surface-200 dark:border-surface-700">
+										<td class="px-4 py-3 font-mono whitespace-nowrap">{sj.job_id}</td>
+										<td class="px-4 py-3 font-mono whitespace-nowrap">{sj.rule ?? ''}</td>
+										<td class="px-4 py-3 font-mono truncate max-w-[16rem]" title={sj.genome ?? ''}>{sj.genome ?? ''}</td>
+										<td class="px-4 py-3 font-semibold whitespace-nowrap {getSlurmStatusColor(sj.status)}">{sj.status}</td>
+										<td class="px-4 py-3 whitespace-nowrap {sj.source === 'from cache' ? 'text-purple-500 font-semibold' : 'text-surface-500'}">{sj.source ?? 'fresh run'}</td>
+										<td class="px-4 py-3 font-mono whitespace-nowrap">{sj.time}</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+					<p class="text-xs text-surface-400 mt-1">Drag the bottom-right corner to resize.</p>
+				{:else}
+					<p class="text-surface-500 mt-4">No jobs currently running on Slurm.</p>
+				{/if}
 				</div>
-			{:else}
-				<p class="text-surface-500">No jobs currently running on Slurm.</p>
 			{/if}
 		</section>
 
@@ -470,6 +606,7 @@
 				<span class="transform transition-transform {showContainers ? 'rotate-180' : ''}">&#9660;</span>
 			</button>
 			{#if showContainers}
+				<div>
 				{#if (job.containers ?? []).length > 0}
 					<div class="overflow-x-auto mt-4">
 						<table class="w-full text-sm text-left">
@@ -500,6 +637,7 @@
 				{:else}
 					<p class="text-surface-500 mt-4">No containers loaded yet.</p>
 				{/if}
+				</div>
 			{/if}
 		</section>
 
@@ -523,17 +661,26 @@
 		<!-- Output Files -->
 		{#if job.work_dir}
 			<section class="card p-6 bg-surface-100 dark:bg-surface-800">
-				<div class="flex items-center gap-3 mb-2">
-					<h2 class="text-xl font-semibold">Output Files</h2>
-					{#if job.status === 'completed'}
-						<span class="text-xs font-semibold px-2 py-1 rounded bg-green-500/20 text-green-500">Files Complete</span>
-					{:else if job.status === 'failed'}
-						<span class="text-xs font-semibold px-2 py-1 rounded bg-red-500/20 text-red-500">Failed</span>
-					{:else}
-						<span class="text-xs font-semibold px-2 py-1 rounded bg-yellow-500/20 text-yellow-500 animate-pulse">Pending</span>
-					{/if}
-				</div>
-				<p class="text-sm text-surface-500 mb-2 font-mono">{job.work_dir}</p>
+				<button
+					type="button"
+					onclick={() => showOutputFiles = !showOutputFiles}
+					class="flex items-center justify-between w-full text-left"
+				>
+					<div class="flex items-center gap-3">
+						<h2 class="text-xl font-semibold">Output Files</h2>
+						{#if job.status === 'completed'}
+							<span class="text-xs font-semibold px-2 py-1 rounded bg-green-500/20 text-green-500">Files Complete</span>
+						{:else if job.status === 'failed'}
+							<span class="text-xs font-semibold px-2 py-1 rounded bg-red-500/20 text-red-500">Failed</span>
+						{:else}
+							<span class="text-xs font-semibold px-2 py-1 rounded bg-yellow-500/20 text-yellow-500 animate-pulse">Pending</span>
+						{/if}
+					</div>
+					<span class="transform transition-transform {showOutputFiles ? 'rotate-180' : ''}">&#9660;</span>
+				</button>
+				{#if showOutputFiles}
+				<div>
+				<p class="text-sm text-surface-500 mb-2 mt-2 font-mono">{job.work_dir}</p>
 				{#if currentSubdir}
 					<p class="text-sm text-surface-400 mb-2 font-mono">/ {currentSubdir}</p>
 				{/if}
@@ -556,7 +703,7 @@
 				{#if filesLoading && outputFiles.length === 0}
 					<p class="text-surface-500">Loading files...</p>
 				{:else if outputFiles.length > 0}
-					<div class="space-y-1">
+					<div class="space-y-1 overflow-y-auto h-60 min-h-[120px] max-h-[80vh] rounded border border-surface-300 dark:border-surface-600 p-2 pr-3">
 						{#each outputFiles as entry}
 							{#if entry.type === 'directory'}
 								<button
@@ -577,6 +724,13 @@
 									</div>
 									<div class="flex items-center gap-3">
 										<span class="text-xs text-surface-400">{formatFileSize(entry.size)}</span>
+										{#if isViewable(entry.name)}
+											<button
+												type="button"
+												onclick={() => openViewer(entry)}
+												class="text-xs text-primary-500 hover:text-primary-400"
+											>View</button>
+										{/if}
 										<button
 											type="button"
 											onclick={() => downloadFile(entry.name)}
@@ -589,6 +743,8 @@
 					</div>
 				{:else}
 					<p class="text-surface-500">No files found.</p>
+				{/if}
+				</div>
 				{/if}
 			</section>
 		{/if}
@@ -604,7 +760,17 @@
 				<span class="transform transition-transform {showLogs ? 'rotate-180' : ''}">&#9660;</span>
 			</button>
 			{#if showLogs}
-				<div class="mt-4 p-4 bg-surface-900 text-green-400 font-mono text-sm rounded-lg overflow-x-auto max-h-96 overflow-y-auto">
+				<div class="relative mt-4">
+					<button
+						type="button"
+						onclick={copyLogs}
+						disabled={!job.logs}
+						class="absolute top-2 right-2 z-10 text-xs font-semibold px-3 py-1.5 rounded bg-surface-700 hover:bg-surface-600 text-surface-200 disabled:opacity-50 transition-colors shadow"
+						title="Copy logs to clipboard"
+					>
+						{logsCopied ? 'Copied!' : 'Copy'}
+					</button>
+					<div class="p-4 bg-surface-900 text-green-400 font-mono text-sm rounded-lg overflow-x-auto max-h-96 overflow-y-auto">
 					{#if job.logs}
 						{#each logGroups as group}
 							{#if group.type === 'pip'}
@@ -637,6 +803,7 @@
 						<p class="text-surface-500">No logs available yet.</p>
 					{/if}
 				</div>
+			</div>
 			{/if}
 		</section>
 
@@ -662,9 +829,38 @@
 				<span>Job is running. This page will update automatically.</span>
 			</div>
 		{/if}
+
+		{#if job.status === 'failed' || job.status === 'cancelled' || job.still_active === false}
+			<div class="flex justify-end">
+				<button
+					type="button"
+					onclick={resumeFailedJob}
+					disabled={resumeInFlight}
+					class="btn variant-filled-primary px-4 py-2 text-sm font-semibold"
+				>{resumeInFlight ? 'Resuming...' : 'Resume from where it failed'}</button>
+			</div>
+		{/if}
 	{:else}
 		<div class="card p-8 bg-surface-100 dark:bg-surface-800 text-center">
 			<p class="text-surface-500">Job not found.</p>
+		</div>
+	{/if}
+
+	{#if pendingLargeFile}
+		<div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onclick={() => pendingLargeFile = null} role="button" tabindex="-1">
+			<div class="bg-surface-100 dark:bg-surface-800 rounded-lg shadow-2xl max-w-md w-full overflow-y-auto app-pop-in" onclick={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
+				<div class="px-6 py-4 border-b border-surface-300 dark:border-surface-600">
+					<h2 class="text-xl font-bold text-primary-500">Large file</h2>
+				</div>
+				<div class="px-6 py-5 space-y-3 text-surface-700 dark:text-surface-300">
+					<p><span class="font-mono text-sm">{pendingLargeFile.name}</span> is {formatFileSize(pendingLargeFile.size)}.</p>
+					<p class="text-sm">Loading the row count for a file this size may take a few seconds. Continue?</p>
+				</div>
+				<div class="px-6 py-4 border-t border-surface-300 dark:border-surface-600 flex justify-end gap-3">
+					<button type="button" onclick={() => pendingLargeFile = null} class="btn variant-ghost-primary btn-sm">Cancel</button>
+					<button type="button" onclick={confirmViewLargeFile} class="btn variant-filled-primary btn-sm">View Anyway</button>
+				</div>
+			</div>
 		</div>
 	{/if}
 </div>

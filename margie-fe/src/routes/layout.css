@@ -6,3 +6,150 @@
 @import '@skeletonlabs/skeleton/themes/modern';
 @import '@skeletonlabs/skeleton/themes/vintage';
 @import '@skeletonlabs/skeleton/themes/seafoam';
+
+:root {
+	--app-bg-a: #f7fbf8;
+	--app-bg-b: #eef6ff;
+	--app-ink: #112120;
+	--app-accent: #0f766e;
+	--app-accent-2: #f59e0b;
+}
+
+html,
+body {
+	min-height: 100%;
+}
+
+body {
+	/* Fixed, non-dark-aware color/background here was overriding Skeleton's
+	   own dark-aware body color/background at equal specificity (this rule
+	   loads after Skeleton's imports), pinning text dark even once dark
+	   mode correctly darkened surrounding cards via their own dark:
+	   classes -- exactly the dark-text-on-dark-input bug. Reusing
+	   Skeleton's own surface tokens here for the dark variant keeps this
+	   consistent with how the rest of the app already does dark mode. */
+	color: var(--app-ink);
+	background:
+		radial-gradient(1200px 550px at 0% 0%, rgba(15, 118, 110, 0.08), transparent 60%),
+		radial-gradient(900px 500px at 100% 0%, rgba(245, 158, 11, 0.08), transparent 55%),
+		linear-gradient(180deg, var(--app-bg-a), var(--app-bg-b));
+
+	@variant dark {
+		color: var(--color-surface-50);
+		background:
+			radial-gradient(1200px 550px at 0% 0%, rgba(45, 212, 191, 0.10), transparent 60%),
+			radial-gradient(900px 500px at 100% 0%, rgba(245, 158, 11, 0.08), transparent 55%),
+			linear-gradient(180deg, var(--color-surface-950), var(--color-surface-900));
+	}
+}
+
+@keyframes app-fade-in {
+	from {
+		opacity: 0;
+		transform: translateY(10px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes app-pop-in {
+	from {
+		opacity: 0;
+		transform: scale(0.98) translateY(8px);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1) translateY(0);
+	}
+}
+
+.app-fade-in {
+	animation: app-fade-in 420ms ease-out both;
+}
+
+.app-pop-in {
+	animation: app-pop-in 220ms ease-out both;
+}
+
+.app-stagger-1 {
+	animation-delay: 50ms;
+}
+
+.app-stagger-2 {
+	animation-delay: 110ms;
+}
+
+.app-stagger-3 {
+	animation-delay: 170ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.app-fade-in,
+	.app-pop-in {
+		animation: none;
+	}
+}
+
+code,
+pre,
+kbd,
+samp,
+.font-mono {
+	font-family: 'IBM Plex Mono', 'JetBrains Mono', 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+}
+
+.app-shell {
+	min-height: 100vh;
+}
+
+.app-content {
+	width: 100%;
+	max-width: none;
+	margin: 0 auto;
+	padding: 1.25rem clamp(0.75rem, 2vw, 2rem) 2rem;
+}
+
+.app-page-frame {
+	border: 1px solid rgba(15, 23, 42, 0.08);
+	border-radius: 1.25rem;
+	background: rgba(255, 255, 255, 0.55);
+	backdrop-filter: blur(3px);
+	box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+
+	@variant dark {
+		border-color: rgba(255, 255, 255, 0.08);
+		background: color-mix(in oklab, var(--color-surface-900) 70%, transparent);
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+	}
+}
+
+.glass-card {
+	border: 1px solid rgba(15, 23, 42, 0.08);
+	border-radius: 1rem;
+	background: rgba(255, 255, 255, 0.78);
+	backdrop-filter: blur(6px);
+	box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+
+	@variant dark {
+		border-color: rgba(255, 255, 255, 0.1);
+		background: color-mix(in oklab, var(--color-surface-900) 85%, transparent);
+		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+	}
+}
+
+.hero-button {
+	background: linear-gradient(120deg, var(--app-accent), #14b8a6);
+	color: #f8fffd;
+}
+
+.subtle-button {
+	border: 1px solid rgba(15, 23, 42, 0.08);
+	background: rgba(255, 255, 255, 0.8);
+}
+
+.beta-strip {
+	border: 1px solid rgba(15, 118, 110, 0.2);
+	background: linear-gradient(90deg, rgba(15, 118, 110, 0.09), rgba(245, 158, 11, 0.08));
+}

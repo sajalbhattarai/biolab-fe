@@ -20,20 +20,21 @@
 	}
 </script>
 
-<div class="container mx-auto p-8 space-y-8 max-w-6xl">
+<div class="w-full px-4 md:px-6 py-8 space-y-8">
 	<!-- Page Header -->
 	<section class="flex justify-between items-start">
 		<div>
 			<h1 class="text-4xl font-bold text-primary-500 mb-2">Analysis Results</h1>
+			<p class="text-sm text-surface-500 dark:text-surface-400 mb-2">This mock results page demonstrates the kinds of outputs the real workflow will surface after a run completes.</p>
 			<p class="text-lg text-surface-600 dark:text-surface-300">Sample ID: <span class="font-mono font-semibold">GEN-2024-001234</span></p>
 			<p class="text-sm text-surface-500">Completed: December 29, 2024 at 14:32 UTC</p>
 		</div>
 		<div class="flex gap-2">
-			<button class="btn variant-outline-primary" on:click={shareResults}>
+			<button class="btn variant-outline-primary" onclick={shareResults}>
 				<Share2 class="size-4 mr-2" />
 				Share
 			</button>
-			<button class="btn variant-filled-primary" on:click={downloadResults}>
+			<button class="btn variant-filled-primary" onclick={downloadResults}>
 				<Download class="size-4 mr-2" />
 				Download Report
 			</button>
@@ -53,7 +54,9 @@
 
 	<!-- Summary Statistics -->
 	<section class="card p-6 bg-surface-100 dark:bg-surface-800">
-		<h2 class="text-2xl font-bold mb-6 text-primary-500">Summary Statistics</h2>
+		<div class="flex items-center gap-2 mb-6">
+			<h2 class="text-2xl font-bold text-primary-500">Summary Statistics</h2>
+		</div>
 
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 			<div class="p-4 bg-surface-200 dark:bg-surface-700 rounded-lg">
@@ -77,7 +80,9 @@
 
 	<!-- Quality Metrics -->
 	<section class="card p-6 bg-surface-100 dark:bg-surface-800">
-		<h2 class="text-2xl font-bold mb-6 text-secondary-500">Quality Metrics</h2>
+		<div class="flex items-center gap-2 mb-6">
+			<h2 class="text-2xl font-bold text-secondary-500">Quality Metrics</h2>
+		</div>
 
 		<div class="space-y-4">
 			<div>
@@ -124,7 +129,9 @@
 
 	<!-- Taxonomic Distribution Graph -->
 	<section class="card p-6 bg-surface-100 dark:bg-surface-800">
-		<h2 class="text-2xl font-bold mb-6 text-tertiary-500">Taxonomic Distribution</h2>
+		<div class="flex items-center gap-2 mb-6">
+			<h2 class="text-2xl font-bold text-tertiary-500">Taxonomic Distribution</h2>
+		</div>
 
 		<div class="space-y-4">
 			{#each graphData as item}
@@ -156,7 +163,9 @@
 
 	<!-- Gene Predictions -->
 	<section class="card p-6 bg-surface-100 dark:bg-surface-800">
-		<h2 class="text-2xl font-bold mb-6 text-primary-500">Gene Predictions</h2>
+		<div class="flex items-center gap-2 mb-6">
+			<h2 class="text-2xl font-bold text-primary-500">Gene Predictions</h2>
+		</div>
 
 		<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
 			<div class="p-4 bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900/30 dark:to-primary-800/30 rounded-lg border border-primary-300 dark:border-primary-700">
@@ -215,7 +224,9 @@
 
 	<!-- Phylogenetic Analysis -->
 	<section class="card p-6 bg-surface-100 dark:bg-surface-800">
-		<h2 class="text-2xl font-bold mb-6 text-secondary-500">Phylogenetic Analysis</h2>
+		<div class="flex items-center gap-2 mb-6">
+			<h2 class="text-2xl font-bold text-secondary-500">Phylogenetic Analysis</h2>
+		</div>
 
 		<div class="mb-4">
 			<p class="text-surface-700 dark:text-surface-300 mb-4">
@@ -229,7 +240,7 @@
 				src="/phylogenetic-tree.png"
 				alt="Phylogenetic Tree"
 				class="max-w-full h-auto rounded"
-				on:error={(e) => {
+				onerror={(e) => {
 					e.currentTarget.style.display = 'none';
 					e.currentTarget.parentElement.innerHTML = '<div class="text-center"><p class="text-surface-500 mb-2">📊</p><p class="text-surface-600 dark:text-surface-400">Phylogenetic tree visualization</p><p class="text-sm text-surface-500">Image: /phylogenetic-tree.png</p></div>';
 				}}
@@ -250,7 +261,9 @@
 
 	<!-- Download Options -->
 	<section class="card p-6 bg-surface-100 dark:bg-surface-800">
-		<h2 class="text-2xl font-bold mb-6">Download Files</h2>
+		<div class="flex items-center gap-2 mb-6">
+			<h2 class="text-2xl font-bold">Download Files</h2>
+		</div>
 
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 			<button class="p-4 bg-surface-200 dark:bg-surface-700 rounded-lg hover:bg-surface-300 dark:hover:bg-surface-600 transition-colors text-left">

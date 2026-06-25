@@ -37,7 +37,7 @@
 	}
 </script>
 
-<div class="container mx-auto p-8 max-w-2xl">
+<div class="w-full px-4 md:px-6 py-8 max-w-none">
 	<h1 class="text-4xl font-bold mb-8 text-center text-primary-500">Hi Dane</h1>
 
 	{#if error}

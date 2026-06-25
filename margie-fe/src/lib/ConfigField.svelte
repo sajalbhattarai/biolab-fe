@@ -7,6 +7,7 @@
 		description: string;
 		default?: any;
 		required?: boolean;
+		compact?: boolean;
 		value: any;
 		onchange: (value: any) => void;
 	}
@@ -17,6 +18,7 @@
 		description,
 		default: defaultValue = null,
 		required = false,
+		compact = false,
 		value,
 		onchange
 	}: Props = $props();
@@ -40,8 +42,8 @@
 	}
 </script>
 
-<div class="config-field mb-4">
-	<div class="flex-1 mb-2">
+<div class="config-field {compact ? 'config-field-compact mb-2' : 'mb-4'}">
+	<div class="flex-1 {compact ? 'mb-1' : 'mb-2'}">
 		<span class="font-medium">
 			{displayName}
 			{#if required}
@@ -85,5 +87,9 @@
 	.config-field {
 		border-left: 3px solid rgb(var(--color-primary-500) / 0.3);
 		padding-left: 0.75rem;
+	}
+
+	.config-field-compact {
+		padding-left: 0.5rem;
 	}
 </style>

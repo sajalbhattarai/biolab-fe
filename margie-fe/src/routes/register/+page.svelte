@@ -9,7 +9,6 @@
 	let privateKey = $state('');
 	let loading = $state(false);
 	let error = $state('');
-	let showKeyHelp = $state(false);
 
 	async function handleRegister(e: Event) {
 		e.preventDefault();
@@ -115,31 +114,22 @@
 						/>
 					</div>
 					<div>
-						<div class="flex items-center gap-2 mb-1">
-							<label for="privateKey" class="text-sm font-semibold">SSH Private Key</label>
-							<button
-								type="button"
-								onclick={() => showKeyHelp = !showKeyHelp}
-								class="w-5 h-5 rounded-full bg-surface-300 dark:bg-surface-600 text-surface-700 dark:text-surface-200 text-xs font-bold leading-none flex items-center justify-center hover:bg-primary-400 hover:text-white transition-colors"
-								title="How to get your SSH private key"
-							>?</button>
-						</div>
+						<label for="privateKey" class="block text-sm font-semibold mb-1">SSH Private Key</label>
 
-						{#if showKeyHelp}
-							<div class="mb-3 p-4 rounded-lg bg-surface-200 dark:bg-surface-700 border border-surface-300 dark:border-surface-600 text-sm space-y-3">
-								<p class="font-semibold text-primary-500">How to set up your SSH key</p>
+						<div class="mb-3 p-4 rounded-lg bg-surface-200 dark:bg-surface-700 border border-surface-300 dark:border-surface-600 text-sm space-y-3">
+							<p class="font-semibold text-primary-500">How to set up your SSH key</p>
 
-								<div>
-									<p class="font-semibold mb-1">Already have a key you use to SSH into the cluster?</p>
-									<p class="text-surface-600 dark:text-surface-400 mb-1">Run this on your local machine and paste the output below:</p>
-									<pre class="bg-black text-green-400 rounded p-2 text-xs overflow-x-auto">cat ~/.ssh/id_ed25519
+							<div>
+								<p class="font-semibold mb-1">Already have a key you use to SSH into the cluster?</p>
+								<p class="text-surface-600 dark:text-surface-400 mb-1">Run this on your local machine and paste the output below:</p>
+								<pre class="bg-black text-green-400 rounded p-2 text-xs overflow-x-auto">cat ~/.ssh/id_ed25519
 # or: cat ~/.ssh/id_rsa</pre>
-								</div>
+							</div>
 
-								<div>
-									<p class="font-semibold mb-1">Need to create a new key?</p>
-									<p class="text-surface-600 dark:text-surface-400 mb-1">Run these on your local machine:</p>
-									<pre class="bg-black text-green-400 rounded p-2 text-xs overflow-x-auto"># 1. Generate a new keypair
+							<div>
+								<p class="font-semibold mb-1">Need to create a new key?</p>
+								<p class="text-surface-600 dark:text-surface-400 mb-1">Run these on your local machine:</p>
+								<pre class="bg-black text-green-400 rounded p-2 text-xs overflow-x-auto"># 1. Generate a new keypair
 ssh-keygen -t ed25519 -f ~/.ssh/bsp_key -C "bsp"
 
 # 2. Copy the public half to your cluster
@@ -147,13 +137,12 @@ ssh-copy-id -i ~/.ssh/bsp_key.pub {clusterUsername || 'you'}@{clusterHost || 'yo
 
 # 3. Paste the private half below
 cat ~/.ssh/bsp_key</pre>
-								</div>
-
-								<p class="text-surface-500 dark:text-surface-400 text-xs border-t border-surface-300 dark:border-surface-600 pt-3">
-									Your private key is AES-256 encrypted before storage and is never returned by the API or written to disk on the server. BSP decrypts it in memory only when making a connection on your behalf.
-								</p>
 							</div>
-						{/if}
+
+							<p class="text-surface-500 dark:text-surface-400 text-xs border-t border-surface-300 dark:border-surface-600 pt-3">
+								Your private key is AES-256 encrypted before storage and is never returned by the API or written to disk on the server. BSP decrypts it in memory only when making a connection on your behalf.
+							</p>
+						</div>
 
 						<textarea
 							id="privateKey"

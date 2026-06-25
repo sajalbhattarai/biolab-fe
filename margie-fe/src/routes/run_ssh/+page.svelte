@@ -48,12 +48,12 @@
 	}
 </script>
 
-<div class="container mx-auto p-8 max-w-2xl">
-	<h1 class="text-4xl font-bold mb-8 text-center text-secondary-500">Run SSH</h1>
-
-	<div class="bg-surface-200 dark:bg-surface-700 border-l-4 border-secondary-500 p-4 rounded mb-6">
-		<p class="text-sm text-surface-600 dark:text-surface-300">
-			This will run your script via SSH tunneling onto your remote server on the login node.
+<div class="w-full px-4 md:px-6 py-8 max-w-none">
+	<div class="mb-8 text-center">
+		<h1 class="text-4xl font-bold text-secondary-500">Run SSH</h1>
+		<p class="text-sm text-surface-500 dark:text-surface-400 mt-2 max-w-2xl mx-auto">
+			Use this page to execute a script on the remote server over SSH on the login node.
+			It is meant for direct remote execution, not for submitting a SLURM batch job.
 		</p>
 	</div>
 
@@ -71,7 +71,7 @@
 	{/if}
 
 	<div class="card p-6 bg-surface-100 dark:bg-surface-800">
-		<form on:submit={handleSubmit} class="space-y-4">
+		<form onsubmit={handleSubmit} class="space-y-4">
 			<div>
 				<label for="script" class="block text-sm font-semibold mb-2">
 					Script Content
