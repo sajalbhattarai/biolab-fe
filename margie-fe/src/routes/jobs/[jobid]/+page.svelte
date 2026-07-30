@@ -176,8 +176,8 @@
 				fetchJobFiles(currentSubdir);
 			}
 
-			// Stop polling if job is done
-			if (job && (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled')) {
+			// Stop polling if job is done AND not still active on the cluster
+			if (job && (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') && !job.still_active) {
 				// One final file fetch on completion
 				if (job.work_dir) {
 					fetchJobFiles(currentSubdir);
@@ -461,7 +461,7 @@
 						<span class="inline-block w-3 h-3 rounded-full {getStatusColor(job.status)}"></span>
 						<span class="font-semibold">{getStatusText(job.status)}</span>
 					</div>
-					{#if job.status === 'running' || job.status === 'pending' || job.status === 'snakemake'}
+					{#if job.status === 'running' || job.status === 'pending' || job.status === 'snakemake' || job.still_active}
 						<button
 							type="button"
 							onclick={() => cancelJob()}
@@ -482,10 +482,15 @@
 				</div>
 			{/if}
 
+
+
 			<div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
 				<div>
 					<span class="text-surface-500 block">Phase</span>
 					<span class="font-semibold">{job.phase || 'Initializing'}</span>
+					{#if job.resumed_from_history}
+						<span class="text-xs text-yellow-500">last known</span>
+					{/if}
 				</div>
 				<div>
 					<span class="text-surface-500 block">Started</span>
@@ -819,6 +824,14 @@
 		{:else if job.status === 'cancelled'}
 			<div class="bg-orange-100 border border-orange-400 text-orange-700 px-4 py-3 rounded">
 				Job was cancelled by user. All SLURM jobs have been terminated.
+			</div>
+		{:else if job.still_active}
+			<div class="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded flex items-center gap-2">
+				<svg class="animate-spin h-4 w-4 shrink-0" viewBox="0 0 24 24">
+					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+				</svg>
+				<span>Job is still running on the cluster. Live updates will resume shortly.</span>
 			</div>
 		{:else}
 			<div class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded flex items-center gap-2">
