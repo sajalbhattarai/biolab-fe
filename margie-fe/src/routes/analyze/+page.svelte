@@ -3,6 +3,8 @@
 	import { goto } from '$app/navigation';
 	import { authHeaders, clearToken } from '$lib/auth.js';
 	import ConfigField from '$lib/ConfigField.svelte';
+	import LicenseGate from '$lib/LicenseGate.svelte';
+	import { fetchLicenseStatus, revokeLicense } from '$lib/license';
 	import { isWorkflowPathParam, getNestedValue, setNestedValue } from '$lib/configParams';
 
 	const API_URL = typeof window !== 'undefined' && window.location.hostname === 'localhost'
@@ -10,6 +12,24 @@
 		: '';
 
 	function handle401() { clearToken(); goto('/login'); }
+
+	async function confirmRevoke() {
+		if (revoking) return;
+		revoking = true;
+		revokeError = '';
+		try {
+			await revokeLicense();
+			// Drop straight back to the gate; it will also re-show on next load
+			// since the acceptance row for the current terms is now gone.
+			licenseAccepted = false;
+			showRevokeConfirm = false;
+		} catch (e) {
+			if (e instanceof Error && e.message === 'unauthorized') { handle401(); return; }
+			revokeError = e instanceof Error ? e.message : 'Failed to revoke license';
+		} finally {
+			revoking = false;
+		}
+	}
 
 	interface WorkflowDetails {
 		id: string;
@@ -30,6 +50,9 @@
 
 	let genomePath = $state('');
 	let outputDir = $state('');
+	// NOTE: the full per-genome operon atlas opt-in lives in Profile → Workflow
+	// Specific Settings (persisted as run_full_operon_map). The backend reads it
+	// from the saved config, so it is intentionally NOT duplicated on this page.
 	let homeDir = $state('');
 	let selectedWorkflow = $state('margie_sb');
 	let userConfig = $state<Record<string, any>>({});
@@ -38,6 +61,12 @@
 	let quickLoading = $state(false);
 	let freshLoading = $state(false);
 	let error = $state('');
+	let licenseChecking = $state(true);
+	let licenseAccepted = $state(false);
+	// Self-service license revocation (small button above the workflow box).
+	let showRevokeConfirm = $state(false);
+	let revoking = $state(false);
+	let revokeError = $state('');
 	let selectedTools = $state<Set<string>>(new Set());
 	let savingPathSettings = $state(false);
 	let pathSettingsSaved = $state(false);
@@ -112,6 +141,16 @@
 	}
 
 	onMount(async () => {
+		// License gate: has this user accepted the current terms?
+		try {
+			const s = await fetchLicenseStatus();
+			licenseAccepted = s.accepted;
+		} catch (e) {
+			if (e instanceof Error && e.message === 'unauthorized') { handle401(); return; }
+		} finally {
+			licenseChecking = false;
+		}
+
 		// Fetch home_dir for the placeholder
 		try {
 			const res = await fetch(`${API_URL}/v1/auth/me`, { headers: authHeaders() });
@@ -212,11 +251,51 @@
 <div class="w-full px-4 md:px-6 py-8">
 	<h1 class="text-4xl font-bold mb-8 text-center text-primary-500">Genome Analysis</h1>
 
+	{#if licenseChecking}
+		<p class="text-center text-surface-500 dark:text-surface-400">Checking licensing status…</p>
+	{:else if !licenseAccepted}
+		<LicenseGate onaccepted={() => (licenseAccepted = true)} />
+	{:else}
+
 	{#if error}
 		<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
 			{error}
 		</div>
 	{/if}
+
+	<!-- Revoke License (self-service) — top-right, above the workflow box -->
+	<div class="flex justify-end items-center gap-3 mb-2 min-h-8">
+		{#if revokeError}
+			<span class="text-xs text-red-600">{revokeError}</span>
+		{/if}
+		{#if showRevokeConfirm}
+			<span class="text-sm text-surface-600 dark:text-surface-300">Revoke your license acceptance?</span>
+			<button
+				type="button"
+				onclick={confirmRevoke}
+				disabled={revoking}
+				class="text-sm font-medium text-red-600 hover:underline disabled:opacity-50"
+			>
+				{revoking ? 'Revoking…' : 'Yes'}
+			</button>
+			<button
+				type="button"
+				onclick={() => (showRevokeConfirm = false)}
+				disabled={revoking}
+				class="text-sm font-medium text-surface-500 hover:underline disabled:opacity-50"
+			>
+				No
+			</button>
+		{:else}
+			<button
+				type="button"
+				onclick={() => { revokeError = ''; showRevokeConfirm = true; }}
+				class="text-sm text-surface-500 hover:text-red-600 hover:underline"
+			>
+				Revoke License
+			</button>
+		{/if}
+	</div>
 
 	<!-- Workflow Selection -->
 	{#if availableWorkflows.length > 0}
@@ -391,5 +470,7 @@
 		</div>
 		</div>
 	</details>
+
+	{/if}
 </div>
 
