@@ -50,16 +50,50 @@
 	const ID_PATTERN = /^[A-Za-z0-9_.-]+$/;
 
 	const COLUMN_TINTS = [
-		'bg-blue-500/5',
-		'bg-green-500/5',
-		'bg-amber-500/5',
-		'bg-purple-500/5',
-		'bg-pink-500/5',
-		'bg-cyan-500/5',
+		'bg-blue-500/10',
+		'bg-green-500/10',
+		'bg-amber-500/10',
+		'bg-purple-500/10',
+		'bg-pink-500/10',
+		'bg-cyan-500/10',
 	];
 
 	function columnTint(index: number): string {
 		return COLUMN_TINTS[index % COLUMN_TINTS.length];
+	}
+
+	// Figure-matching palette (reportfig_lib.CONF_TIER_COLOR) so the key "answer"
+	// columns read the SAME colours as the operon-diagram figures and the Excel.
+	const TIER_COLOR: Record<string, string> = {
+		highest: '#1f77ff', high: '#00b84d', medium: '#ffcc00', fair: '#ff8c00', low: '#ee2233',
+	};
+	function hexLum(h: string): number {
+		const s = h.replace('#', '');
+		return (0.299 * parseInt(s.slice(0, 2), 16) + 0.587 * parseInt(s.slice(2, 4), 16) + 0.114 * parseInt(s.slice(4, 6), 16)) / 255;
+	}
+	function contrastFg(h: string): string {
+		return hexLum(h) > 0.55 ? '#111111' : '#ffffff';
+	}
+	function normCol(name: string): string {
+		return name.replace(/^(?:\[[A-Z]+\]-|Column-[A-Z]+:\s*)/i, '').trim().toLowerCase();
+	}
+	// Bright pill {bg,fg} for a value in a tier / review / context column, else null.
+	function pillStyle(colName: string, value: string): { bg: string; fg: string } | null {
+		const c = normCol(colName);
+		const v = value.trim().toLowerCase();
+		if (c === 'confidence_tier' || c === 'confidence_tier_hybrid') {
+			const bg = TIER_COLOR[v];
+			if (bg) return { bg, fg: contrastFg(bg) };
+		}
+		if (c === 'needs_review?' || c === 'needs_review') {
+			if (v === 'yes') return { bg: '#ee2233', fg: '#ffffff' };
+			if (v === 'no') return { bg: '#1e9e57', fg: '#ffffff' };
+		}
+		if (c === 'does_operon_context_improve_confidence?') {
+			if (v.includes('increase')) return { bg: '#6b8e23', fg: '#ffffff' };
+			if (v.includes('decrease')) return { bg: '#8b0000', fg: '#ffffff' };
+		}
+		return null;
 	}
 
 	let currentPage = $state(1);
@@ -267,8 +301,12 @@
 						{#each rows as row}
 							<tr class="hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors align-top">
 								{#each row as cell, i}
+									{@const pill = pillStyle(columns[i] ?? '', cell)}
 									<td class="p-3 text-sm {columnTint(i)}" title={cell.length > TRUNCATE_AT ? cell : undefined}>
-										{#if isBoolean(cell)}
+										{#if pill}
+											<span class="inline-block rounded px-2 py-0.5 font-semibold whitespace-nowrap"
+												style="background:{pill.bg};color:{pill.fg}">{cell}</span>
+										{:else if isBoolean(cell)}
 											<span class="badge {isTruthy(cell) ? 'variant-filled-success' : 'variant-filled-error'}">{cell}</span>
 										{:else if isIdLike(cell)}
 											<span class="font-mono">{displayValue(cell)}</span>
