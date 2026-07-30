@@ -17,15 +17,17 @@ echo "Installed 'margie'."
 CFG="$HOME/.config/margie"; mkdir -p "$CFG"
 [ -f "$CFG/config" ] && . "$CFG/config"
 
-# ask "<prompt>" <varname>: default = current value, loops until non-empty
+# ask "<prompt>" <varname>: default = current value; Enter keeps it, else type a new one
 ask() {
-    local prompt="$1" var="$2" cur="${!var:-}" inp=""
+    local prompt="$1" var="$2" cur inp=""
+    cur="${!var:-}"                      # (own line: indirect expansion needs var already set)
     while :; do
         if [ -n "$cur" ]; then printf "  %s [%s]: " "$prompt" "$cur"
         else                   printf "  %s: " "$prompt"; fi
-        read -r inp
+        if ! read -r inp; then printf -v "$var" '%s' "$cur"; return; fi   # EOF -> keep current
         inp="${inp:-$cur}"
-        if [ -n "$inp" ]; then printf -v "$var" '%s' "$inp"; break; fi
+        if [ -n "$inp" ]; then printf -v "$var" '%s' "$inp"; return; fi
+        echo "  (required — please enter a value)"
     done
 }
 
