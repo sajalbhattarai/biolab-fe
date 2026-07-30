@@ -1,24 +1,40 @@
 #!/usr/bin/env bash
-# One-time setup: install `margie`, ask for your HPC details, and add it to PATH.
+# Set up (or update) `margie`. Safe to re-run any time — it shows your current
+# HPC settings as defaults so you can change where the backend is cloned.
 # Run from the repo folder:  ./scripts/setup-frontend.sh
 set -e
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 
-# install the launcher as `margie`
+# install / refresh the launcher as `margie`
 BIN="$HOME/bin"; mkdir -p "$BIN"
 chmod +x "$REPO/scripts/margie.sh"
 printf '#!/usr/bin/env bash\nexec "%s/scripts/margie.sh" "$@"\n' "$REPO" > "$BIN/margie"
 chmod +x "$BIN/margie"
 echo "Installed 'margie'."
 
-# ask for your HPC details — nothing is hardcoded
+# load current settings as defaults (re-running lets you UPDATE them; you can also
+# edit ~/.config/margie/config first and just press Enter to keep those values)
+CFG="$HOME/.config/margie"; mkdir -p "$CFG"
+[ -f "$CFG/config" ] && . "$CFG/config"
+
+# ask "<prompt>" <varname>: default = current value, loops until non-empty
+ask() {
+    local prompt="$1" var="$2" cur="${!var:-}" inp=""
+    while :; do
+        if [ -n "$cur" ]; then printf "  %s [%s]: " "$prompt" "$cur"
+        else                   printf "  %s: " "$prompt"; fi
+        read -r inp
+        inp="${inp:-$cur}"
+        if [ -n "$inp" ]; then printf -v "$var" '%s' "$inp"; break; fi
+    done
+}
+
 echo
 echo "Point margie at your HPC (you need a cluster account and the backend cloned there):"
-HPC_HOST=""; BACKEND_DIR=""
-while [ -z "$HPC_HOST" ];    do printf "  HPC SSH host/alias (e.g. from ~/.ssh/config): "; read -r HPC_HOST; done
-while [ -z "$BACKEND_DIR" ]; do printf "  Path to bioinformatics-tools on the HPC: ";      read -r BACKEND_DIR; done
+ask "HPC SSH host/alias (e.g. from ~/.ssh/config)" HPC_HOST
+ask "Path to bioinformatics-tools on the HPC"       BACKEND_DIR
 
-# confirm the backend is really there (this also checks your cluster access)
+# confirm the backend is really there (also checks your cluster access)
 echo "  checking $HPC_HOST:$BACKEND_DIR ..."
 if ssh -o ConnectTimeout=15 "$HPC_HOST" "test -d '$BACKEND_DIR'" 2>/dev/null; then
     echo "  ok — backend found on the HPC"
@@ -26,10 +42,9 @@ else
     echo "  ! couldn't confirm it — make sure you can SSH to '$HPC_HOST' and have cloned the backend at '$BACKEND_DIR'"
 fi
 
-# save your settings (on your machine only — never committed)
-CFG="$HOME/.config/margie"; mkdir -p "$CFG"
+# save (on your machine only — never committed)
 cat > "$CFG/config" <<EOF
-# margie settings (written by setup-frontend.sh)
+# margie settings (written by setup-frontend.sh; safe to edit by hand)
 HPC_HOST=$HPC_HOST
 BACKEND_DIR=$BACKEND_DIR
 # HPC_FRONTEND_DIR=   # path to margie-fe on the HPC — only for: margie --sync (dev)
