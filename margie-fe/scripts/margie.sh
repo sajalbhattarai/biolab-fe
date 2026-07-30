@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/usr/bin/env bash
 # Build and run the MARGIE front-end locally.
 #
 # Prerequisite: the backend API must be reachable at http://localhost:8000.
