@@ -1,30 +1,35 @@
 #!/usr/bin/env bash
-# One-time setup: install the `margie` command and put it on your PATH.
-# Run from the repo root after cloning:  ./scripts/setup-frontend.sh
+# One-time setup: install the `margie` command, create its config, and add it to PATH.
+# Run from the repo folder:  ./scripts/setup-frontend.sh
 set -e
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
 
-REPO="$(cd "$(dirname "$0")/.." && pwd)"     # the margie-fe repo root
-BIN="$HOME/bin"
-mkdir -p "$BIN"
-
+# install the launcher as `margie`
+BIN="$HOME/bin"; mkdir -p "$BIN"
 chmod +x "$REPO/scripts/margie.sh"
-cat > "$BIN/margie" <<EOF
-#!/usr/bin/env bash
-exec "$REPO/scripts/margie.sh" "\$@"
-EOF
+printf '#!/usr/bin/env bash\nexec "%s/scripts/margie.sh" "$@"\n' "$REPO" > "$BIN/margie"
 chmod +x "$BIN/margie"
-echo "Installed 'margie' -> $REPO/scripts/margie.sh"
+echo "Installed 'margie'"
 
-# add ~/bin to PATH in the right profile for your shell, if it isn't already there
+# create the config (you fill it in)
+CFG="$HOME/.config/margie"; mkdir -p "$CFG"
+if [ ! -f "$CFG/config" ]; then
+    cat > "$CFG/config" <<'EOF'
+# margie settings — fill these in, then run: margie
+HPC_HOST=                 # your HPC SSH host/alias (an entry in ~/.ssh/config)
+BACKEND_DIR=              # path to bioinformatics-tools on the HPC
+# HPC_FRONTEND_DIR=       # path to margie-fe on the HPC — only for: margie --sync (dev)
+EOF
+    echo "Created $CFG/config — edit it before your first run"
+fi
+
+# put ~/bin on PATH for your shell
 case "${SHELL:-}" in
     */zsh)  PROFILE="$HOME/.zshrc" ;;
     */bash) PROFILE="$HOME/.bash_profile" ;;
     *)      PROFILE="$HOME/.profile" ;;
 esac
 LINE='export PATH="$HOME/bin:$PATH"'
-if ! grep -qF "$LINE" "$PROFILE" 2>/dev/null; then
-    echo "$LINE" >> "$PROFILE"
-    echo "Added ~/bin to PATH in $PROFILE"
-fi
+grep -qF "$LINE" "$PROFILE" 2>/dev/null || echo "$LINE" >> "$PROFILE"
 
-echo "Done. Open a new terminal (or: source $PROFILE), then run:  margie"
+echo "Done. Edit ~/.config/margie/config, open a new terminal, then run:  margie"
