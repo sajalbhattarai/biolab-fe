@@ -24,6 +24,15 @@
 	let error = $state('');
 	let copiedPath = $state('');
 
+	// In-browser file viewer modal.
+	let viewOpen = $state(false);
+	let viewName = $state('');
+	let viewContent = $state('');
+	let viewBinary = $state(false);
+	let viewTruncated = $state(false);
+	let viewLoading = $state(false);
+	let viewError = $state('');
+
 	// Breadcrumb segments with their cumulative absolute paths.
 	let crumbs = $derived.by(() => {
 		const parts = currentPath.split('/').filter(Boolean);
@@ -67,6 +76,38 @@
 	function openDir(name: string) { browse(joinPath(currentPath, name)); }
 	function goUp() { if (currentPath !== '/') browse(parent); }
 	function submitPath(e: Event) { e.preventDefault(); if (pathInput.trim()) browse(pathInput.trim()); }
+
+	async function viewFile(name: string) {
+		const path = joinPath(currentPath, name);
+		viewOpen = true;
+		viewName = name;
+		viewContent = '';
+		viewBinary = false;
+		viewTruncated = false;
+		viewError = '';
+		viewLoading = true;
+		try {
+			const res = await fetch(
+				`${API_URL}/v1/ssh/browse_view?path=${encodeURIComponent(path)}`,
+				{ headers: authHeaders() }
+			);
+			if (res.status === 401) { handle401(); return; }
+			if (!res.ok) {
+				const body = await res.json().catch(() => null);
+				throw new Error(body?.detail || 'Failed to open file');
+			}
+			const data = await res.json();
+			viewBinary = data.binary;
+			viewTruncated = data.truncated;
+			viewContent = data.content;
+		} catch (e) {
+			viewError = e instanceof Error ? e.message : 'Failed to open file';
+		} finally {
+			viewLoading = false;
+		}
+	}
+
+	function closeView() { viewOpen = false; }
 
 	async function copyPath(name: string) {
 		const path = joinPath(currentPath, name);
@@ -166,9 +207,58 @@
 						>
 							{copiedPath === joinPath(currentPath, entry.name) ? '✓ Copied' : 'Copy path'}
 						</button>
+
+						{#if entry.type === 'file'}
+							<button
+								type="button"
+								onclick={() => viewFile(entry.name)}
+								class="btn btn-sm variant-filled-primary px-2 text-xs"
+							>
+								👁 View
+							</button>
+						{/if}
 					</li>
 				{/each}
 			</ul>
 		{/if}
 	</div>
 </div>
+
+<!-- File viewer modal -->
+{#if viewOpen}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+		onclick={closeView}
+		role="presentation"
+	>
+		<div
+			class="bg-surface-100 dark:bg-surface-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[85vh] flex flex-col"
+			onclick={(e) => e.stopPropagation()}
+			role="dialog"
+			aria-modal="true"
+		>
+			<div class="flex items-center justify-between px-4 py-3 border-b border-surface-300 dark:border-surface-700">
+				<h2 class="font-mono text-sm font-semibold truncate">{viewName}</h2>
+				<button type="button" onclick={closeView} class="btn btn-sm variant-soft px-3">✕ Close</button>
+			</div>
+			<div class="p-4 overflow-auto">
+				{#if viewLoading}
+					<p class="text-surface-600 dark:text-surface-400">Loading...</p>
+				{:else if viewError}
+					<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">{viewError}</div>
+				{:else if viewBinary}
+					<p class="text-surface-600 dark:text-surface-400">
+						This looks like a binary file and can't be shown as text. Use “Copy path” to reference it.
+					</p>
+				{:else}
+					{#if viewTruncated}
+						<div class="bg-amber-100 border border-amber-400 text-amber-800 px-3 py-2 rounded mb-3 text-sm">
+							Showing the first part of a large file (truncated).
+						</div>
+					{/if}
+					<pre class="text-xs font-mono whitespace-pre overflow-x-auto">{viewContent}</pre>
+				{/if}
+			</div>
+		</div>
+	</div>
+{/if}
