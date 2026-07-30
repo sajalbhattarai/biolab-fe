@@ -217,6 +217,22 @@
 		}
 	}
 
+	// Trigger a browser download from a Blob. The anchor MUST be in the document
+	// and the object URL must outlive the click, or some browsers (Firefox always,
+	// Chromium intermittently) silently no-op -- which was why the direct tsv/excel
+	// buttons "did nothing" while the viewer's identical-but-in-DOM path worked.
+	function saveBlob(blob: Blob, fileName: string) {
+		const blobUrl = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = blobUrl;
+		a.download = fileName;
+		a.rel = 'noopener';
+		document.body.appendChild(a);
+		a.click();
+		a.remove();
+		setTimeout(() => URL.revokeObjectURL(blobUrl), 1500);
+	}
+
 	async function downloadFile(fileName: string) {
 		const apiUrl = getApiUrl();
 		const relativePath = currentSubdir ? `${currentSubdir}/${fileName}` : fileName;
@@ -225,24 +241,41 @@
 			const res = await fetch(url, { headers: authHeaders() });
 			if (res.status === 401) { handle401(); return; }
 			if (!res.ok) { filesError = 'Download failed'; return; }
-			const blob = await res.blob();
-			const blobUrl = URL.createObjectURL(blob);
-			const a = document.createElement('a');
-			a.href = blobUrl;
-			a.download = fileName;
-			a.click();
-			URL.revokeObjectURL(blobUrl);
+			saveBlob(await res.blob(), fileName);
 		} catch (e) {
 			filesError = e instanceof Error ? e.message : 'Download failed';
+		}
+	}
+
+	async function downloadFileAsExcel(fileName: string) {
+		const apiUrl = getApiUrl();
+		const relativePath = currentSubdir ? `${currentSubdir}/${fileName}` : fileName;
+		const xlsxName = fileName.replace(/\.(tsv|csv)$/i, '.xlsx');
+		const url = `${apiUrl}/v1/ssh/download_file/${jobId}?path=${encodeURIComponent(relativePath)}&format=excel`;
+		try {
+			const res = await fetch(url, { headers: authHeaders() });
+			if (res.status === 401) { handle401(); return; }
+			if (!res.ok) { filesError = 'Excel download failed'; return; }
+			saveBlob(await res.blob(), xlsxName);
+		} catch (e) {
+			filesError = e instanceof Error ? e.message : 'Excel download failed';
 		}
 	}
 
 	const LARGE_FILE_WARN_BYTES = 100 * 1024 * 1024; // 100MB, easy to tune
 	let pendingLargeFile = $state<FileEntry | null>(null);
 
-	function isViewable(name: string): boolean {
+	function isTabular(name: string): boolean {
 		const lower = name.toLowerCase();
 		return lower.endsWith('.tsv') || lower.endsWith('.csv');
+	}
+
+	function isImage(name: string): boolean {
+		return /\.(png|jpe?g|gif|webp|svg)$/.test(name.toLowerCase());
+	}
+
+	function isViewable(name: string): boolean {
+		return isTabular(name) || isImage(name);
 	}
 
 	function launchViewerTab(fileName: string) {
@@ -809,6 +842,14 @@
 												onclick={() => openViewer(entry)}
 												class="text-xs text-primary-500 hover:text-primary-400"
 											>View</button>
+										{/if}
+										{#if isTabular(entry.name)}
+											<button
+												type="button"
+												onclick={() => downloadFileAsExcel(entry.name)}
+												class="text-xs text-green-500 hover:text-green-400 font-semibold"
+												title="Download as Excel with tier coloring"
+											>Excel</button>
 										{/if}
 										<button
 											type="button"
