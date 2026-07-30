@@ -137,6 +137,7 @@
 	let showContainers = $state(false);
 	let showSlurmJobs = $state(true);
 	let showOutputFiles = $state(true);
+	let showFileGuide = $state(false);
 	let expandPipLogs = $state(false);
 	let logGroups = $derived(job?.logs ? processLogs(job.logs) : []);
 
@@ -553,14 +554,22 @@
 
 		<!-- Slurm Jobs -->
 		<section class="card p-6 bg-surface-100 dark:bg-surface-800">
-			<button
-				type="button"
-				onclick={() => showSlurmJobs = !showSlurmJobs}
-				class="flex items-center justify-between w-full text-left"
-			>
-				<h2 class="text-xl font-semibold">Slurm Jobs</h2>
-				<span class="transform transition-transform {showSlurmJobs ? 'rotate-180' : ''}">&#9660;</span>
-			</button>
+			<div class="flex items-center justify-between">
+				<button
+					type="button"
+					onclick={() => showSlurmJobs = !showSlurmJobs}
+					class="flex items-center gap-3 text-left flex-1"
+				>
+					<h2 class="text-xl font-semibold">Slurm Jobs</h2>
+					<span class="transform transition-transform {showSlurmJobs ? 'rotate-180' : ''}">&#9660;</span>
+				</button>
+				<button
+					type="button"
+					onclick={() => fetchJobStatus()}
+					class="text-xs text-primary-500 hover:text-primary-400 px-2 py-1 rounded border border-primary-500/30 hover:border-primary-400 transition-colors"
+					title="Refresh SLURM jobs"
+				>↻ Refresh</button>
+			</div>
 			{#if showSlurmJobs}
 				<div>
 				{#if (job.slurm_jobs ?? []).length > 0}
@@ -666,26 +675,91 @@
 		<!-- Output Files -->
 		{#if job.work_dir}
 			<section class="card p-6 bg-surface-100 dark:bg-surface-800">
-				<button
-					type="button"
-					onclick={() => showOutputFiles = !showOutputFiles}
-					class="flex items-center justify-between w-full text-left"
-				>
-					<div class="flex items-center gap-3">
-						<h2 class="text-xl font-semibold">Output Files</h2>
-						{#if job.status === 'completed'}
-							<span class="text-xs font-semibold px-2 py-1 rounded bg-green-500/20 text-green-500">Files Complete</span>
-						{:else if job.status === 'failed'}
-							<span class="text-xs font-semibold px-2 py-1 rounded bg-red-500/20 text-red-500">Failed</span>
-						{:else}
-							<span class="text-xs font-semibold px-2 py-1 rounded bg-yellow-500/20 text-yellow-500 animate-pulse">Pending</span>
-						{/if}
-					</div>
-					<span class="transform transition-transform {showOutputFiles ? 'rotate-180' : ''}">&#9660;</span>
-				</button>
+				<div class="flex items-center justify-between">
+					<button
+						type="button"
+						onclick={() => showOutputFiles = !showOutputFiles}
+						class="flex items-center gap-3 text-left flex-1"
+					>
+						<div class="flex items-center gap-3">
+							<h2 class="text-xl font-semibold">Output Files</h2>
+							{#if job.status === 'completed'}
+								<span class="text-xs font-semibold px-2 py-1 rounded bg-green-500/20 text-green-500">Files Complete</span>
+							{:else if job.status === 'failed'}
+								<span class="text-xs font-semibold px-2 py-1 rounded bg-red-500/20 text-red-500">Failed</span>
+							{:else}
+								<span class="text-xs font-semibold px-2 py-1 rounded bg-yellow-500/20 text-yellow-500 animate-pulse">Pending</span>
+							{/if}
+						</div>
+						<span class="transform transition-transform {showOutputFiles ? 'rotate-180' : ''}">&#9660;</span>
+					</button>
+					<button
+						type="button"
+						onclick={() => fetchJobFiles(currentSubdir)}
+						disabled={filesLoading}
+						class="text-xs text-primary-500 hover:text-primary-400 px-2 py-1 rounded border border-primary-500/30 hover:border-primary-400 transition-colors disabled:opacity-50"
+						title="Refresh file listing"
+					>↻ Refresh</button>
+				</div>
 				{#if showOutputFiles}
 				<div>
 				<p class="text-sm text-surface-500 mb-2 mt-2 font-mono">{job.work_dir}</p>
+
+				<!-- File Guide -->
+				<div class="mb-3 border border-primary-500/20 rounded-lg overflow-hidden">
+					<button
+						type="button"
+						onclick={() => showFileGuide = !showFileGuide}
+						class="flex items-center justify-between w-full px-4 py-2.5 bg-primary-500/5 hover:bg-primary-500/10 text-left transition-colors"
+					>
+						<span class="text-sm font-semibold text-primary-400">Which files should I download?</span>
+						<span class="text-xs text-surface-400 transform transition-transform {showFileGuide ? 'rotate-180' : ''}">&#9660;</span>
+					</button>
+					{#if showFileGuide}
+						<div class="px-4 py-3 space-y-4 text-sm bg-surface-50 dark:bg-surface-900 border-t border-primary-500/20">
+
+							<p class="text-surface-500 dark:text-surface-400">
+								When a genome finishes, its folder is tidied into just <span class="font-semibold">three things</span>.
+								Here is what each one is:
+							</p>
+
+							<div>
+								<p class="text-xs font-semibold uppercase text-surface-400 mb-1 tracking-wide">1 &middot; Final annotation</p>
+								<p class="font-mono text-xs font-semibold text-green-400 break-all">&lt;organism&gt;/FINAL_ANNOTATION_WITH_CONFIDENCE.tsv&nbsp;(+&nbsp;.xlsx)</p>
+								<p class="text-surface-500 text-xs mt-1">
+									The publication-ready, per-gene results table: the concordant annotation label, C1&ndash;C4 confidence
+									components, final confidence (adjacency and hybrid), operon context and members, and review flags.
+									Open the <span class="font-mono">.tsv</span> in the viewer here, or grab the ready-made
+									<span class="font-mono">.xlsx</span> sitting right beside it &mdash; already colour-coded by confidence
+									tier to match the diagrams.
+								</p>
+							</div>
+
+							<div class="border-t border-surface-300 dark:border-surface-700 pt-3">
+								<p class="text-xs font-semibold uppercase text-surface-400 mb-1 tracking-wide">2 &middot; Diagrams</p>
+								<p class="font-mono text-xs font-semibold text-blue-400 break-all">&lt;organism&gt;/diagrams/</p>
+								<p class="text-surface-500 text-xs mt-1">
+									The genome's figures &mdash; confidence-tier / confidence-stage / component figures plus the operon-context
+									figures. If you enabled <span class="font-semibold">Full-genome operon map</span> in your Profile settings,
+									the complete per-operon atlas (every operon drawn with its per-gene confidence table) is in
+									<span class="font-mono">diagrams/complete-organism-operon-diagrams/</span>.
+								</p>
+							</div>
+
+							<div class="border-t border-surface-300 dark:border-surface-700 pt-3">
+								<p class="text-xs font-semibold uppercase text-surface-400 mb-1 tracking-wide">3 &middot; Per-tool phased output</p>
+								<p class="font-mono text-xs font-semibold text-amber-400 break-all">&lt;organism&gt;/per-tool-phased-output/</p>
+								<p class="text-surface-500 text-xs mt-1">
+									Everything else, kept for provenance: each annotation tool's phase folder (PGAP, eggNOG, InterPro,
+									RASTtk, and the rest) and the intermediate scoring tables under <span class="font-mono">scoring/</span>.
+									You rarely need these &mdash; the Final annotation above is the distilled result.
+								</p>
+							</div>
+
+						</div>
+					{/if}
+				</div>
+
 				{#if currentSubdir}
 					<p class="text-sm text-surface-400 mb-2 font-mono">/ {currentSubdir}</p>
 				{/if}
