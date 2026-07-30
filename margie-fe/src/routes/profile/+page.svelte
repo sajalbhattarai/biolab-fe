@@ -20,6 +20,7 @@
 	let pathTestResult = $state<{writable: boolean; error?: string} | null>(null);
 	let selectedWorkflowPathId = $state('');
 	let selectedToolKeys = $state<Set<string>>(new Set());
+	let generateFullOperonMap = $state(false);
 	let error = $state('');
 	let success = $state('');
 	let credentialsError = $state('');
@@ -234,6 +235,10 @@
 		if (selectedWorkflowPathId) {
 			if (!configToSave[selectedWorkflowPathId]) configToSave[selectedWorkflowPathId] = {};
 			configToSave[selectedWorkflowPathId].default_selected_tools = Array.from(selectedToolKeys).join(',');
+			// Persisted opt-in: the backend reads this server-side at run time
+			// (does not depend on the Analyze-page payload), gating the full
+			// per-genome operon atlas.
+			configToSave[selectedWorkflowPathId].run_full_operon_map = generateFullOperonMap;
 		}
 
 		return configToSave;
@@ -283,6 +288,12 @@
 				selectableTools.filter(tool => tool.phase <= DEFAULT_ON_MAX_PHASE).map(tool => tool.key)
 			));
 		}
+	});
+
+	// Load the persisted full-operon-map opt-in for the selected workflow, so the
+	// toggle reflects what's saved (and is checked when it's on).
+	$effect(() => {
+		generateFullOperonMap = Boolean(config[selectedWorkflowPathId]?.run_full_operon_map);
 	});
 
 	async function saveConfig() {
@@ -749,6 +760,23 @@
 										</label>
 									{/each}
 								</div>
+							</div>
+						{/if}
+
+						{#if selectedWorkflowPathId === 'margie_sb'}
+							<div class="rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-900/40 p-4">
+								<label class="flex items-start gap-3 cursor-pointer">
+									<input type="checkbox" bind:checked={generateFullOperonMap} class="mt-1 accent-primary-500" />
+									<div class="min-w-0">
+										<h4 class="text-lg font-semibold text-secondary-500">Full-genome operon map</h4>
+										<p class="mt-1 text-xs text-surface-500 dark:text-surface-400 leading-snug">
+											Draw operon diagrams for <span class="font-semibold">every</span> gene in each
+											genome (all operon sizes, paginated) — not just the representative examples.
+											Heavier (~3-4&nbsp;min/genome) and runs after scoring. Saved with this
+											workflow, so every run applies it until you turn it off here.
+										</p>
+									</div>
+								</label>
 							</div>
 						{/if}
 
