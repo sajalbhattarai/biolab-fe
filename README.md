@@ -92,6 +92,46 @@ If both print a version number, and Node matches the rule above, you're all set.
 
 </details>
 
+<details>
+<summary><b>Don't have Node.js or Git yet?</b></summary>
+
+**The simplest way** — download and run the official installers:
+
+- Node.js — [nodejs.org](https://nodejs.org/) (choose the **LTS** version)
+- Git — [git-scm.com/downloads](https://git-scm.com/downloads)
+
+**Or use a package manager**
+
+macOS — with [Homebrew](https://brew.sh):
+
+```bash
+brew install node git
+```
+
+Windows — with winget (built into Windows 10/11):
+
+```powershell
+winget install OpenJS.NodeJS Git.Git
+```
+
+Linux — Debian or Ubuntu:
+
+```bash
+sudo apt update
+sudo apt install -y nodejs npm git
+```
+
+**Then check they're ready** — open a new terminal and run:
+
+```bash
+node --version
+git --version
+```
+
+If both print a version number, you're all set. (Node.js should be 18 or newer — if it's older, install the LTS version from [nodejs.org](https://nodejs.org/).)
+
+</details>
+
 ## Quick start
 
 > On Windows? Jump to **[Windows](#windows)** — it's one command, but a different one.
