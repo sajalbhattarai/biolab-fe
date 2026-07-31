@@ -113,6 +113,13 @@ if ! ssh -S "$SOCKET" "$HPC_HOST" "
     export PATH=\"\$HOME/.local/bin:\$HOME/.cargo/bin:\$PATH\"
     command -v uv >/dev/null 2>&1 || { echo '  uv is not installed on the HPC (or not on PATH).' >&2; exit 5; }
     uv sync || { echo '  uv sync failed (see above).' >&2; exit 6; }
+    if [ ! -f .env ]; then
+        sk=\$(.venv/bin/python -c 'import secrets; print(secrets.token_urlsafe(32))')
+        ek=\$(.venv/bin/python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')
+        printf 'BSP_SECRET_KEY=%s\\nBSP_ENCRYPTION_KEY=%s\\n' \"\$sk\" \"\$ek\" > .env
+        chmod 600 .env
+        echo '  created backend .env with fresh BSP_SECRET_KEY / BSP_ENCRYPTION_KEY'
+    fi
 "; then
     echo
     echo "  Backend could not be prepared on the HPC. Fix the above, then re-run."
@@ -128,14 +135,24 @@ BE_PID="$(ssh -S "$SOCKET" "$HPC_HOST" "
 row "dane-api pid" "$BE_PID"
 
 printf '  waiting for backend'
+backend_ready="no"
 for i in $(seq 1 60); do
     if ssh -S "$SOCKET" "$HPC_HOST" "curl -fsS http://localhost:8000 >/dev/null 2>&1"; then
         printf ' ready\n'
+        backend_ready="yes"
         break
     fi
     printf '.'
     sleep 1
 done
+if [ "$backend_ready" != "yes" ]; then
+    printf '\n'
+    echo "  dane-api did not start. Last lines of its log:"
+    ssh -S "$SOCKET" "$HPC_HOST" "tail -n 20 $REMOTE_LOG 2>/dev/null" | sed 's/^/    /'
+    echo "  A common cause: the backend has no .env with BSP_SECRET_KEY / BSP_ENCRYPTION_KEY"
+    echo "  (see the backend's README / docs/LOCAL_DEV.md)."
+    exit 1
+fi
 
 # ---------------------------------------------------------------------------
 # Open the SSH tunnel (local :8000 -> backend :8000)
