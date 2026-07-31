@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
-# Set up the `margie` command. Run from the repo folder:  ./scripts/setup-frontend.sh
-# Re-run any time — it keeps your saved settings. To change where your backend lives,
-# edit the two lines at the top of ~/bin/margie.
+# First-time setup for the MARGIE front-end.
+#
+# All it does: remember your HPC host + backend path (for next time), install the
+# `margie` command, then open the app so you can register and connect once. That
+# first connection is what links your workstation to the backend — nothing is
+# started on the HPC here.
+#
+# After this, just run:  margie   (that one starts the backend on the HPC for you).
+# Run from the repo folder:  ./scripts/setup-frontend.sh
 set -e
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 BIN="$HOME/bin"; MARGIE="$BIN/margie"; mkdir -p "$BIN"
@@ -18,7 +24,7 @@ if [ -n "$HPC_HOST" ] && [ -n "$BACKEND_DIR" ]; then
     echo "Using your saved settings:  $HPC_HOST : $BACKEND_DIR"
     echo "(to change them later, edit the top of $MARGIE)"
 else
-    # first run — ask once. Enter keeps a shown default; typing replaces it.
+    # first run — just note these two things down; nothing connects yet.
     ask() {
         local prompt="$1" var="$2" cur inp=""
         cur="${!var:-}"
@@ -31,19 +37,12 @@ else
             echo "  (required — please enter a value)"
         done
     }
-    echo "Point margie at your HPC (you need a cluster account and the backend cloned there):"
+    echo "Two quick things (saved for next time — nothing connects yet):"
     ask "HPC SSH host/alias (e.g. from ~/.ssh/config)" HPC_HOST
     ask "Path to bioinformatics-tools on the HPC"       BACKEND_DIR
-    # confirm the backend is really there (also checks your cluster access)
-    echo "  checking $HPC_HOST:$BACKEND_DIR ..."
-    if ssh -o ConnectTimeout=15 "$HPC_HOST" "test -d '$BACKEND_DIR'" 2>/dev/null; then
-        echo "  ok — backend found on the HPC"
-    else
-        echo "  ! couldn't confirm — make sure you can SSH to '$HPC_HOST' and cloned the backend at '$BACKEND_DIR'"
-    fi
 fi
 
-# write the launcher with your settings baked in (this file lives only on your machine)
+# save your settings into the installed launcher (this file lives only on your machine)
 cat > "$MARGIE" <<EOF
 #!/usr/bin/env bash
 # margie launcher — EDIT THESE if your backend location on the HPC changes:
@@ -64,5 +63,17 @@ esac
 LINE='export PATH="$HOME/bin:$PATH"'
 grep -qF "$LINE" "$PROFILE" 2>/dev/null || echo "$LINE" >> "$PROFILE"
 
+# open the app so you can register + connect for the very first time
 echo
-echo "Done. Open a new terminal (or: source $PROFILE), then run:  margie"
+echo "Opening the app — register there to link your workstation to the backend."
+echo "Next time, in a new terminal, just run:  margie"
+echo
+cd "$REPO"
+VITE_LOG="/tmp/margie-vite.log"
+npm install >/dev/null 2>&1
+npm run dev > "$VITE_LOG" 2>&1 &
+FE_PID=$!
+for i in $(seq 1 60); do grep -q "Local:" "$VITE_LOG" && break; sleep 1; done
+open "http://localhost:5173" 2>/dev/null || xdg-open "http://localhost:5173" 2>/dev/null || true
+echo "App running at http://localhost:5173   (press Ctrl-C here when you're done)"
+wait "$FE_PID"
