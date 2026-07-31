@@ -34,6 +34,10 @@
 	// eggNOG-mapper is AGPL-3.0; as a network service the operator must offer its
 	// corresponding source. Surface that in the footer, driven by the catalog.
 	let sourceTool = $derived((terms?.tools ?? []).find((t) => t.id === 'eggnog'));
+	// Every tool/database, in pipeline order, for the full license disclosure.
+	let sortedTools = $derived(
+		[...(terms?.tools ?? [])].sort((a, b) => a.phase - b.phase || a.name.localeCompare(b.name))
+	);
 
 	onMount(async () => {
 		try {
@@ -136,6 +140,21 @@
 			</div>
 		{/if}
 
+		<!-- Full per-tool / database license details -->
+		<h3 class="text-lg font-semibold mt-2 mb-1">License details for every tool &amp; database</h3>
+		<p class="text-sm text-surface-500 dark:text-surface-400 mb-2">
+			MARGIE runs these third-party tools and databases, each under its own license. By accepting,
+			you agree to use each responsibly, within its license, and to credit its authors.
+		</p>
+		<details class="mb-5">
+			<summary class="cursor-pointer text-sm font-medium">Show all {sortedTools.length} licenses</summary>
+			<div class="mt-3 space-y-3 max-h-96 overflow-y-auto pr-2">
+				{#each sortedTools as t (t.id)}
+					{@render licenseRow(t)}
+				{/each}
+			</div>
+		</details>
+
 		<!-- Full terms text -->
 		<h3 class="text-lg font-semibold mt-2 mb-1">Terms &amp; acknowledgment</h3>
 		<div
@@ -212,6 +231,29 @@
 		</div>
 	{/if}
 </div>
+
+{#snippet licenseRow(t: CatalogTool)}
+	<div class="rounded border border-surface-300 dark:border-surface-600 p-3">
+		<div class="font-semibold">{t.name}</div>
+		<dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 mt-1 text-xs">
+			<dt class="text-surface-500 dark:text-surface-400">License type</dt><dd>{t.license}</dd>
+			<dt class="text-surface-500 dark:text-surface-400">Academic use</dt><dd>{t.academic_use}</dd>
+			<dt class="text-surface-500 dark:text-surface-400">Research use</dt><dd>{t.research_use}</dd>
+			<dt class="text-surface-500 dark:text-surface-400">Commercial use</dt><dd>{t.commercial_use}</dd>
+			<dt class="text-surface-500 dark:text-surface-400">Permission</dt><dd>{t.user_action}</dd>
+			{#if t.obtain_url}
+				<dt class="text-surface-500 dark:text-surface-400">License link</dt>
+				<dd><a href={t.obtain_url} target="_blank" rel="noopener noreferrer" class="text-primary-500 underline break-all">{t.obtain_url}</a></dd>
+			{/if}
+		</dl>
+		{#if t.license_quote}
+			<div class="mt-2">
+				<span class="text-[10px] uppercase tracking-wide text-surface-400">License notice ({t.license_quote_kind === 'verbatim' ? 'verbatim' : 'summary'})</span>
+				<pre class="mt-1 whitespace-pre-wrap font-mono text-xs bg-surface-50 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded p-2">{t.license_quote}</pre>
+			</div>
+		{/if}
+	</div>
+{/snippet}
 
 {#snippet toolCard(t: CatalogTool)}
 	<div class="rounded border border-surface-300 dark:border-surface-600 p-3">

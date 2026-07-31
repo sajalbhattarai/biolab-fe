@@ -28,12 +28,17 @@ export interface CatalogTool {
 	license: string;
 	redistribution?: string;
 	commercial_use?: string;
+	academic_use?: string;
+	research_use?: string;
 	user_action: string;
 	tier: string;
 	obtain_url: string;
 	allowed: string[];
 	not_allowed: string[];
 	citation?: string;
+	license_quote?: string;
+	license_quote_source?: string;
+	license_quote_kind?: string;
 	provenance?: ToolProvenance;
 }
 
