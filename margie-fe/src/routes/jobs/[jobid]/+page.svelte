@@ -975,7 +975,9 @@
 	{/if}
 
 	{#if pendingLargeFile}
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onclick={() => pendingLargeFile = null} role="button" tabindex="-1">
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<div class="bg-surface-100 dark:bg-surface-800 rounded-lg shadow-2xl max-w-md w-full overflow-y-auto app-pop-in" onclick={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
 				<div class="px-6 py-4 border-b border-surface-300 dark:border-surface-600">
 					<h2 class="text-xl font-bold text-primary-500">Large file</h2>
