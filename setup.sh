@@ -7,9 +7,9 @@
 # backend, so the backend has to be up — that is why this launches the full stack.
 #
 # From then on, just run:  margie
-# Run from the repo folder:  ./scripts/setup-frontend.sh
+# Run after cloning:  cd biolab-fe && ./setup.sh
 set -e
-REPO="$(cd "$(dirname "$0")/.." && pwd)"
+REPO="$(cd "$(dirname "$0")/margie-fe" && pwd)"   # the front-end app folder
 BIN="$HOME/bin"; MARGIE="$BIN/margie"; mkdir -p "$BIN"
 chmod +x "$REPO/scripts/margie.sh"
 

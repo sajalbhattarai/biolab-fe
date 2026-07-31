@@ -2,7 +2,7 @@
 #
 # margie — start the MARGIE backend on the HPC, tunnel to it, and run the front-end.
 #
-# Settings (HPC_HOST, BACKEND_DIR) are baked into ~/bin/margie by setup-frontend.sh —
+# Settings (HPC_HOST, BACKEND_DIR) are baked into ~/bin/margie by setup.sh —
 # edit them at the top of that file if your backend location changes.
 #   margie          start everything
 #   margie --sync   also pull the latest front-end from the HPC first (dev only; optional)
@@ -12,8 +12,8 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 
 # HPC_HOST and BACKEND_DIR are set by the installed launcher (~/bin/margie);
 # edit them there if your backend location on the HPC changes.
-: "${HPC_HOST:?not set — run scripts/setup-frontend.sh (or set HPC_HOST at the top of ~/bin/margie)}"
-: "${BACKEND_DIR:?not set — run scripts/setup-frontend.sh (or set BACKEND_DIR at the top of ~/bin/margie)}"
+: "${HPC_HOST:?not set — run ./setup.sh (or set HPC_HOST at the top of ~/bin/margie)}"
+: "${BACKEND_DIR:?not set — run ./setup.sh (or set BACKEND_DIR at the top of ~/bin/margie)}"
 SYNC="no"; [ "${1:-}" = "--sync" ] && SYNC="yes"
 
 FRONTEND_URL="http://localhost:5173"
