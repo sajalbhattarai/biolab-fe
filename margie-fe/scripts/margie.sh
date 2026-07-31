@@ -24,8 +24,10 @@ fi
 # ---------------------------------------------------------------------------
 FRONTEND_URL="http://localhost:5173"
 API_URL="http://localhost:8000"
-VITE_LOG="/tmp/margie-vite.log"
-REMOTE_LOG="/tmp/margie-dane-api.log"
+# Per-user log paths so a leftover file owned by someone else can't block us
+# ($TMPDIR is private per-user on macOS; falls back to /tmp elsewhere).
+VITE_LOG="${TMPDIR:-/tmp}/margie-vite-$USER.log"
+REMOTE_LOG="/tmp/margie-dane-api-$USER.log"
 SOCKET="/tmp/margie-$HPC_HOST-$USER.sock"
 
 # ---------------------------------------------------------------------------
