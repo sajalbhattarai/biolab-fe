@@ -1,19 +1,10 @@
 #!/usr/bin/env bash
-# First-time setup for the MARGIE front-end.
-#
-# It remembers your HPC host + backend path, installs the `margie` command, then
-# hands off to `margie` to start everything (backend on the HPC + tunnel + app)
-# so you can register and connect the first time. Registration talks to the
-# backend, so the backend has to be up — that is why this launches the full stack.
-#
-# From then on, just run:  margie
-# Run after cloning:  cd biolab-fe && ./setup.sh
+# MARGIE GUI — one-time setup. See the README for what this does.
 set -e
-REPO="$(cd "$(dirname "$0")/margie-fe" && pwd)"   # the front-end app folder
+REPO="$(cd "$(dirname "$0")/margie-fe" && pwd)"
 BIN="$HOME/bin"; MARGIE="$BIN/margie"; mkdir -p "$BIN"
 chmod +x "$REPO/scripts/margie.sh"
 
-# reuse whatever your installed launcher already points at, so we don't ask again
 HPC_HOST=""; BACKEND_DIR=""
 if [ -f "$MARGIE" ]; then
     HPC_HOST="$(sed -n 's/^export HPC_HOST="\(.*\)"$/\1/p' "$MARGIE")"
@@ -41,7 +32,6 @@ else
     ask "Path to bioinformatics-tools on the HPC"       BACKEND_DIR
 fi
 
-# save your settings into the installed launcher (this file lives only on your machine)
 cat > "$MARGIE" <<EOF
 #!/usr/bin/env bash
 # margie launcher — EDIT THESE if your backend location on the HPC changes:
@@ -53,7 +43,6 @@ EOF
 chmod +x "$MARGIE"
 echo "Installed $MARGIE"
 
-# put ~/bin on PATH for your shell
 case "${SHELL:-}" in
     */zsh)  PROFILE="$HOME/.zshrc" ;;
     */bash) PROFILE="$HOME/.bash_profile" ;;
@@ -62,8 +51,6 @@ esac
 LINE='export PATH="$HOME/bin:$PATH"'
 grep -qF "$LINE" "$PROFILE" 2>/dev/null || echo "$LINE" >> "$PROFILE"
 
-# hand off to margie: start backend on the HPC + tunnel + app, so you can register.
-# (all the backend/login-node work lives in margie — setup adds none of its own.)
 echo
 echo "Starting MARGIE so you can register — this is exactly what 'margie' does every time."
 echo "In future, just open a new terminal and run:  margie"
