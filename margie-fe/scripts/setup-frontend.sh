@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # First-time setup for the MARGIE front-end.
 #
-# All it does: remember your HPC host + backend path (for next time), install the
-# `margie` command, then open the app so you can register and connect once. That
-# first connection is what links your workstation to the backend — nothing is
-# started on the HPC here.
+# It remembers your HPC host + backend path, installs the `margie` command, then
+# hands off to `margie` to start everything (backend on the HPC + tunnel + app)
+# so you can register and connect the first time. Registration talks to the
+# backend, so the backend has to be up — that is why this launches the full stack.
 #
-# After this, just run:  margie   (that one starts the backend on the HPC for you).
+# From then on, just run:  margie
 # Run from the repo folder:  ./scripts/setup-frontend.sh
 set -e
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -24,7 +24,6 @@ if [ -n "$HPC_HOST" ] && [ -n "$BACKEND_DIR" ]; then
     echo "Using your saved settings:  $HPC_HOST : $BACKEND_DIR"
     echo "(to change them later, edit the top of $MARGIE)"
 else
-    # first run — just note these two things down; nothing connects yet.
     ask() {
         local prompt="$1" var="$2" cur inp=""
         cur="${!var:-}"
@@ -37,7 +36,7 @@ else
             echo "  (required — please enter a value)"
         done
     }
-    echo "Two quick things (saved for next time — nothing connects yet):"
+    echo "Two quick things (saved so you're never asked again):"
     ask "HPC SSH host/alias (e.g. from ~/.ssh/config)" HPC_HOST
     ask "Path to bioinformatics-tools on the HPC"       BACKEND_DIR
 fi
@@ -63,17 +62,10 @@ esac
 LINE='export PATH="$HOME/bin:$PATH"'
 grep -qF "$LINE" "$PROFILE" 2>/dev/null || echo "$LINE" >> "$PROFILE"
 
-# open the app so you can register + connect for the very first time
+# hand off to margie: start backend on the HPC + tunnel + app, so you can register.
+# (all the backend/login-node work lives in margie — setup adds none of its own.)
 echo
-echo "Opening the app — register there to link your workstation to the backend."
-echo "Next time, in a new terminal, just run:  margie"
+echo "Starting MARGIE so you can register — this is exactly what 'margie' does every time."
+echo "In future, just open a new terminal and run:  margie"
 echo
-cd "$REPO"
-VITE_LOG="/tmp/margie-vite.log"
-npm install >/dev/null 2>&1
-npm run dev > "$VITE_LOG" 2>&1 &
-FE_PID=$!
-for i in $(seq 1 60); do grep -q "Local:" "$VITE_LOG" && break; sleep 1; done
-open "http://localhost:5173" 2>/dev/null || xdg-open "http://localhost:5173" 2>/dev/null || true
-echo "App running at http://localhost:5173   (press Ctrl-C here when you're done)"
-wait "$FE_PID"
+exec "$MARGIE"
