@@ -54,7 +54,7 @@ row() {
 cleanup() {
     [ -n "${FE_PID:-}" ]  && kill "$FE_PID"  2>/dev/null
     [ -n "${TUN_PID:-}" ] && kill "$TUN_PID" 2>/dev/null
-    [ -n "${BE_PID:-}" ]  && ssh -S "$SOCKET" "$HPC_HOST" "kill $BE_PID 2>/dev/null" 2>/dev/null
+    [ -n "${BE_PID:-}" ]  && ssh -S "$SOCKET" -o BatchMode=yes "$HPC_HOST" "kill $BE_PID 2>/dev/null" 2>/dev/null
     ssh -S "$SOCKET" -O exit "$HPC_HOST" 2>/dev/null || true
 }
 trap cleanup INT TERM EXIT
@@ -92,15 +92,36 @@ echo "VITE_PUBLIC_API_URL=$API_URL" > "$REPO/.env"
 # ---------------------------------------------------------------------------
 section "Backend (on the HPC)"
 rm -f "$SOCKET"
-ssh -M -S "$SOCKET" -fN "$HPC_HOST"
+# One authenticated master connection; everything below reuses it. If this
+# fails, stop immediately instead of re-prompting for every later SSH call.
+if ! ssh -M -S "$SOCKET" -o ConnectTimeout=15 -fN "$HPC_HOST"; then
+    echo
+    echo "  Could not connect to '$HPC_HOST'."
+    echo "  Check it is <your-hpc-username>@<your-hpc-address> and that you can SSH in,"
+    echo "  then fix the top of ~/bin/margie (or re-run setup) and try again."
+    exit 1
+fi
 
 NODE="$(ssh -S "$SOCKET" "$HPC_HOST" hostname 2>/dev/null)"
 row "node" "$NODE"
 
+# Prepare the environment on the HPC -- errors are shown (not hidden), so a wrong
+# BACKEND_DIR or a uv failure is obvious instead of a silent missing venv.
+if ! ssh -S "$SOCKET" "$HPC_HOST" "
+    cd '$BACKEND_DIR' 2>/dev/null || { echo '  BACKEND_DIR not found on the HPC: $BACKEND_DIR' >&2; exit 3; }
+    [ -f pyproject.toml ] || { echo '  No pyproject.toml in $BACKEND_DIR -- point BACKEND_DIR at the bioinformatics-tools folder itself.' >&2; exit 4; }
+    export PATH=\"\$HOME/.local/bin:\$HOME/.cargo/bin:\$PATH\"
+    command -v uv >/dev/null 2>&1 || { echo '  uv is not installed on the HPC (or not on PATH).' >&2; exit 5; }
+    uv sync || { echo '  uv sync failed (see above).' >&2; exit 6; }
+"; then
+    echo
+    echo "  Backend could not be prepared on the HPC. Fix the above, then re-run."
+    exit 1
+fi
+
 BE_PID="$(ssh -S "$SOCKET" "$HPC_HOST" "
     cd '$BACKEND_DIR' || exit 1
     export PATH=\"\$HOME/.local/bin:\$HOME/.cargo/bin:\$PATH\"
-    uv sync >/dev/null 2>&1
     source .venv/bin/activate
     nohup dane-api > $REMOTE_LOG 2>&1 & echo \$!
 " | tail -1)"
