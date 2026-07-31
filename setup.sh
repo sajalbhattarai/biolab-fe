@@ -15,14 +15,26 @@ mkdir -p "$BIN"
 chmod +x "$REPO/scripts/margie.sh"
 
 # ---------------------------------------------------------------------------
-# Load any settings that were saved on a previous run
+# Your HPC settings.
+# OPTIONAL: fill these in to skip the questions below.
+#   HPC_USER     your HPC username        (e.g. jdoe)
+#   HPC_ADDR     your HPC address         (e.g. cluster.university.edu)
+#   BACKEND_DIR  full path to the bioinformatics-tools folder on the HPC
+#                (the folder that contains pyproject.toml)
 # ---------------------------------------------------------------------------
-HPC_HOST=""
+HPC_USER=""
+HPC_ADDR=""
 BACKEND_DIR=""
 
+# Reuse whatever a previous run saved in ~/bin/margie (unless set above).
 if [ -f "$MARGIE" ]; then
-    HPC_HOST="$(sed -n 's/^export HPC_HOST="\(.*\)"$/\1/p' "$MARGIE")"
-    BACKEND_DIR="$(sed -n 's/^export BACKEND_DIR="\(.*\)"$/\1/p' "$MARGIE")"
+    _saved_host="$(sed -n 's/^export HPC_HOST="\(.*\)"$/\1/p' "$MARGIE")"
+    [ -z "$BACKEND_DIR" ] && BACKEND_DIR="$(sed -n 's/^export BACKEND_DIR="\(.*\)"$/\1/p' "$MARGIE")"
+    case "$_saved_host" in
+        *@*) [ -z "$HPC_USER" ] && HPC_USER="${_saved_host%@*}"
+             [ -z "$HPC_ADDR" ] && HPC_ADDR="${_saved_host#*@}" ;;
+        ?*)  [ -z "$HPC_ADDR" ] && HPC_ADDR="$_saved_host" ;;
+    esac
 fi
 
 # ---------------------------------------------------------------------------
@@ -60,23 +72,19 @@ prompt_for() {
 # ---------------------------------------------------------------------------
 # Ask for the host + backend path (only if we don't already have them)
 # ---------------------------------------------------------------------------
-if [ -n "$HPC_HOST" ] && [ -n "$BACKEND_DIR" ]; then
-    echo "Using your saved settings:  $HPC_HOST : $BACKEND_DIR"
+if [ -n "$HPC_USER" ] && [ -n "$HPC_ADDR" ] && [ -n "$BACKEND_DIR" ]; then
+    echo "Using your saved settings:  $HPC_USER@$HPC_ADDR : $BACKEND_DIR"
     echo "(to change them later, edit the top of $MARGIE)"
 else
-    echo "Two quick things (saved so you're never asked again):"
+    echo "A few things about your HPC (saved so you're never asked again):"
     echo
-    prompt_for "HPC login as user@host (e.g. you@cluster.university.edu), or an alias from ~/.ssh/config" HPC_HOST
-    case "$HPC_HOST" in
-        *@*) : ;;   # already has a username
-        *.*)        # a bare hostname with no username
-            echo "  note: no username given — SSH will log in as '$USER'."
-            echo "        if your HPC login differs, re-run and enter it as  <you>@$HPC_HOST"
-            ;;
-    esac
-    echo
-    prompt_for "Full path to the bioinformatics-tools folder on the HPC (the folder that contains pyproject.toml)" BACKEND_DIR
+    prompt_for "Your HPC username, e.g. jdoe (may differ from your computer's username)" HPC_USER
+    prompt_for "Your HPC address, e.g. cluster.university.edu" HPC_ADDR
+    prompt_for "Full path to the bioinformatics-tools folder on the HPC (contains pyproject.toml)" BACKEND_DIR
 fi
+
+# margie.sh logs in as user@host.
+HPC_HOST="$HPC_USER@$HPC_ADDR"
 
 # ---------------------------------------------------------------------------
 # Write the launcher (~/bin/margie) with the settings baked in
