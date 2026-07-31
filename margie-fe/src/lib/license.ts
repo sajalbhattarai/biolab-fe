@@ -42,11 +42,17 @@ export interface Acknowledgment {
 	label: string;
 }
 
+export interface UsageType {
+	id: string;
+	label: string;
+}
+
 export interface TermsPayload {
 	terms_version: string;
 	terms_sha256: string;
 	terms_markdown: string;
 	acknowledgments: Acknowledgment[];
+	usage_types: UsageType[];
 	catalog_version: string;
 	gated_tools: CatalogTool[];
 	tools: CatalogTool[];
@@ -56,6 +62,9 @@ export interface TermsPayload {
 export interface LicenseStatus {
 	accepted: boolean;
 	current_terms_version: string;
+	usage_type: string | null;
+	licensed_tools: string[];
+	disabled_tools: string[];
 }
 
 async function jsonOrThrow(res: Response): Promise<any> {
@@ -91,6 +100,8 @@ export async function acceptTerms(body: {
 	accepted_items: string[];
 	terms_version: string;
 	terms_sha256: string;
+	usage_type: string;
+	licensed_tools: string[];
 }): Promise<any> {
 	const res = await fetch(`${API_URL}/v1/license/accept`, {
 		method: 'POST',

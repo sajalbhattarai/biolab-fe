@@ -6,6 +6,8 @@
 
 	let terms = $state<TermsPayload | null>(null);
 	let checked = $state<Record<string, boolean>>({});
+	let usageType = $state('');
+	let licensed = $state<Record<string, boolean>>({});
 	let loading = $state(true);
 	let submitting = $state(false);
 	let error = $state('');
@@ -16,6 +18,18 @@
 	let blockedTools = $derived((terms?.gated_tools ?? []).filter((t) => t.tier === 'blocked'));
 	let commercialTools = $derived(
 		(terms?.gated_tools ?? []).filter((t) => t.tier === 'commercial_restricted')
+	);
+	let isCommercial = $derived(usageType === 'commercial');
+	let canAccept = $derived(allChecked && !!usageType);
+	let licensedIds = $derived(Object.keys(licensed).filter((id) => licensed[id]));
+	// Tools that will be turned off for this run, given the current answers:
+	// blocked tools without a license (always), plus commercial-restricted ones
+	// without a license when the use is commercial.
+	let willDisable = $derived(
+		[
+			...blockedTools.filter((t) => !licensed[t.id]),
+			...(isCommercial ? commercialTools.filter((t) => !licensed[t.id]) : [])
+		].map((t) => t.name)
 	);
 	// eggNOG-mapper is AGPL-3.0; as a network service the operator must offer its
 	// corresponding source. Surface that in the footer, driven by the catalog.
@@ -35,14 +49,16 @@
 	});
 
 	async function accept() {
-		if (!terms || !allChecked || submitting) return;
+		if (!terms || !canAccept || submitting) return;
 		submitting = true;
 		error = '';
 		try {
 			await acceptTerms({
 				accepted_items: terms.acknowledgments.filter((a) => checked[a.id]).map((a) => a.id),
 				terms_version: terms.terms_version,
-				terms_sha256: terms.terms_sha256
+				terms_sha256: terms.terms_sha256,
+				usage_type: usageType,
+				licensed_tools: licensedIds
 			});
 			onaccepted();
 		} catch (e) {
@@ -71,6 +87,26 @@
 				{error}
 			</div>
 		{/if}
+
+		<!-- How will you use MARGIE? -->
+		<h3 class="text-lg font-semibold mt-2 mb-1">How will you use MARGIE?</h3>
+		<p class="text-sm text-surface-500 dark:text-surface-400 mb-2">
+			This decides which license-restricted tools are available to you.
+		</p>
+		<div class="space-y-2 mb-5">
+			{#each terms.usage_types as u (u.id)}
+				<label class="flex items-start gap-2 cursor-pointer text-sm">
+					<input
+						type="radio"
+						class="mt-1"
+						name="usage_type"
+						value={u.id}
+						bind:group={usageType}
+					/>
+					<span>{u.label}</span>
+				</label>
+			{/each}
+		</div>
 
 		<!-- Tools you must license yourself -->
 		{#if blockedTools.length > 0}
@@ -116,16 +152,38 @@
 			{/each}
 		</div>
 
+		<!-- What will be disabled, based on the answers above -->
+		{#if usageType}
+			{#if willDisable.length > 0}
+				<div
+					class="text-sm rounded border border-amber-400 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 px-4 py-3 mb-4"
+				>
+					These tools will be turned off for your runs (you can enable one by ticking
+					“I have obtained my own license” above): <b>{willDisable.join(', ')}</b>.
+				</div>
+			{:else}
+				<div
+					class="text-sm rounded border border-green-400 bg-green-50 dark:bg-green-950/40 text-green-800 dark:text-green-300 px-4 py-3 mb-4"
+				>
+					All tools are available for your selected usage.
+				</div>
+			{/if}
+		{/if}
+
 		<div class="flex items-center gap-3">
 			<button
 				class="btn variant-filled-primary px-6 py-2 rounded bg-primary-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-				disabled={!allChecked || submitting}
+				disabled={!canAccept || submitting}
 				onclick={accept}
 			>
 				{submitting ? 'Recording…' : 'Accept and continue'}
 			</button>
 			<span class="text-xs text-surface-400">
-				Terms version {terms.terms_version}. Your acceptance, username, time (UTC) and IP are recorded.
+				{#if !usageType}
+					Select how you'll use MARGIE and check all acknowledgments to continue.
+				{:else}
+					Terms version {terms.terms_version}. Your acceptance, username, time (UTC) and IP are recorded.
+				{/if}
 			</span>
 		</div>
 
@@ -187,5 +245,9 @@
 				Obtain / license this tool →
 			</a>
 		{/if}
+		<label class="flex items-start gap-2 cursor-pointer text-sm mt-2 pt-2 border-t border-surface-200 dark:border-surface-700">
+			<input type="checkbox" class="mt-1" bind:checked={licensed[t.id]} />
+			<span>I have obtained my own license / permission for {t.name}.</span>
+		</label>
 	</div>
 {/snippet}
