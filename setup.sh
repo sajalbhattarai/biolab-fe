@@ -65,8 +65,17 @@ if [ -n "$HPC_HOST" ] && [ -n "$BACKEND_DIR" ]; then
     echo "(to change them later, edit the top of $MARGIE)"
 else
     echo "Two quick things (saved so you're never asked again):"
-    prompt_for "HPC SSH host/alias (e.g. from ~/.ssh/config)" HPC_HOST
-    prompt_for "Path to bioinformatics-tools on the HPC" BACKEND_DIR
+    echo
+    prompt_for "HPC login as user@host (e.g. you@cluster.university.edu), or an alias from ~/.ssh/config" HPC_HOST
+    case "$HPC_HOST" in
+        *@*) : ;;   # already has a username
+        *.*)        # a bare hostname with no username
+            echo "  note: no username given — SSH will log in as '$USER'."
+            echo "        if your HPC login differs, re-run and enter it as  <you>@$HPC_HOST"
+            ;;
+    esac
+    echo
+    prompt_for "Full path to the bioinformatics-tools folder on the HPC (the folder that contains pyproject.toml)" BACKEND_DIR
 fi
 
 # ---------------------------------------------------------------------------
