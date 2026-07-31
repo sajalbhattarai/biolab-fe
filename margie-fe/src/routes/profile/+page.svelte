@@ -4,6 +4,7 @@
 	import { authHeaders, clearToken } from '$lib/auth.js';
 	import ConfigField from '$lib/ConfigField.svelte';
 	import { isWorkflowPathParam, getNestedValue, setNestedValue } from '$lib/configParams';
+	import { fetchLicenseStatus } from '$lib/license';
 
 	const API_URL = typeof window !== 'undefined' && window.location.hostname === 'localhost'
 		? 'http://localhost:8000'
@@ -20,6 +21,7 @@
 	let pathTestResult = $state<{writable: boolean; error?: string} | null>(null);
 	let selectedWorkflowPathId = $state('');
 	let selectedToolKeys = $state<Set<string>>(new Set());
+	let disabledTools = $state<Set<string>>(new Set());
 	let generateFullOperonMap = $state(false);
 	let error = $state('');
 	let success = $state('');
@@ -67,6 +69,12 @@
 	onMount(async () => {
 		await loadUser();
 		await loadWorkflows();
+		try {
+			const s = await fetchLicenseStatus();
+			disabledTools = new Set(s.disabled_tools ?? []);
+		} catch {
+			/* if we can't load it, tools stay enabled; the run path still enforces */
+		}
 	});
 
 	async function loadUser() {
@@ -264,14 +272,16 @@
 	}
 
 	function toggleWorkflowTool(key: string) {
-		if (requiredToolKeys.includes(key)) return;
+		if (requiredToolKeys.includes(key) || disabledTools.has(key)) return;
 		const next = new Set(selectedToolKeys);
 		if (next.has(key)) next.delete(key); else next.add(key);
 		selectedToolKeys = enforceRequiredTools(next);
 	}
 
 	function selectAllWorkflowTools() {
-		selectedToolKeys = enforceRequiredTools(new Set(selectableTools.map(tool => tool.key)));
+		selectedToolKeys = enforceRequiredTools(
+			new Set(selectableTools.map(tool => tool.key).filter(key => !disabledTools.has(key)))
+		);
 	}
 
 	function selectNoWorkflowTools() {
@@ -282,10 +292,10 @@
 		const saved: string | undefined = config[selectedWorkflowPathId]?.default_selected_tools;
 		if (saved) {
 			const savedKeys = new Set(saved.split(',').map(key => key.trim()).filter(Boolean));
-			selectedToolKeys = enforceRequiredTools(new Set(selectableTools.filter(tool => savedKeys.has(tool.key)).map(tool => tool.key)));
+			selectedToolKeys = enforceRequiredTools(new Set(selectableTools.filter(tool => savedKeys.has(tool.key) && !disabledTools.has(tool.key)).map(tool => tool.key)));
 		} else {
 			selectedToolKeys = enforceRequiredTools(new Set(
-				selectableTools.filter(tool => tool.phase <= DEFAULT_ON_MAX_PHASE).map(tool => tool.key)
+				selectableTools.filter(tool => tool.phase <= DEFAULT_ON_MAX_PHASE && !disabledTools.has(tool.key)).map(tool => tool.key)
 			));
 		}
 	});
@@ -740,11 +750,12 @@
 								<div class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
 									{#each selectableTools as tool}
 										{@const isRequired = requiredToolKeys.includes(tool.key)}
-										<label class="flex items-start gap-3 rounded-lg border border-surface-300 dark:border-surface-600 px-3 py-2 {isRequired ? 'bg-surface-200/60 dark:bg-surface-700/40 opacity-90' : 'cursor-pointer hover:bg-surface-200 dark:hover:bg-surface-700'}">
+										{@const isDisabled = disabledTools.has(tool.key)}
+										<label class="flex items-start gap-3 rounded-lg border border-surface-300 dark:border-surface-600 px-3 py-2 {isRequired ? 'bg-surface-200/60 dark:bg-surface-700/40 opacity-90' : isDisabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:bg-surface-200 dark:hover:bg-surface-700'}">
 											<input
 												type="checkbox"
-												checked={selectedToolKeys.has(tool.key)}
-												disabled={isRequired}
+												checked={selectedToolKeys.has(tool.key) && !isDisabled}
+												disabled={isRequired || isDisabled}
 												onchange={() => toggleWorkflowTool(tool.key)}
 												class="mt-1 accent-primary-500"
 											/>
@@ -753,6 +764,9 @@
 													<span class="text-sm font-semibold">{tool.name}</span>
 													{#if isRequired}
 														<span class="text-[10px] uppercase tracking-wide rounded-full bg-primary-500/15 text-primary-700 dark:text-primary-300 px-2 py-0.5">Required</span>
+													{/if}
+													{#if isDisabled}
+														<span class="text-[10px] uppercase tracking-wide rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-0.5">License required</span>
 													{/if}
 												</div>
 												<p class="mt-1 text-xs text-surface-500 leading-snug">{tool.purpose}</p>

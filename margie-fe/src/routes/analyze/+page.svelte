@@ -68,6 +68,7 @@
 	let revoking = $state(false);
 	let revokeError = $state('');
 	let selectedTools = $state<Set<string>>(new Set());
+	let disabledTools = $state<Set<string>>(new Set());
 	let savingPathSettings = $state(false);
 	let pathSettingsSaved = $state(false);
 	// Kept in sync with profile/+page.svelte's REQUIRED_TOOL_KEYS -- see its
@@ -145,6 +146,7 @@
 		try {
 			const s = await fetchLicenseStatus();
 			licenseAccepted = s.accepted;
+			disabledTools = new Set(s.disabled_tools ?? []);
 		} catch (e) {
 			if (e instanceof Error && e.message === 'unauthorized') { handle401(); return; }
 		} finally {
@@ -185,7 +187,25 @@
 		outputDir = wfConfig?.output_path || '';
 	});
 
-	let selectedForRun = $derived(enforceRequiredTools(selectedTools));
+	// Never send a tool the user isn't licensed for — it would be refused
+	// server-side. Disabled tools are dropped from the run set.
+	let selectedForRun = $derived(
+		new Set([...enforceRequiredTools(selectedTools)].filter((k) => !disabledTools.has(k)))
+	);
+
+	let disabledToolNames = $derived(
+		[...disabledTools].map((k) => selectableTools.find((t) => t.key === k)?.name ?? k)
+	);
+
+	async function onLicenseAccepted() {
+		licenseAccepted = true;
+		try {
+			const s = await fetchLicenseStatus();
+			disabledTools = new Set(s.disabled_tools ?? []);
+		} catch {
+			/* status refresh is best-effort; the run path still enforces */
+		}
+	}
 
 	$effect(() => {
 		const saved: string | undefined = userConfig[selectedWorkflow]?.default_selected_tools;
@@ -254,7 +274,7 @@
 	{#if licenseChecking}
 		<p class="text-center text-surface-500 dark:text-surface-400">Checking licensing status…</p>
 	{:else if !licenseAccepted}
-		<LicenseGate onaccepted={() => (licenseAccepted = true)} />
+		<LicenseGate onaccepted={onLicenseAccepted} />
 	{:else}
 
 	{#if error}
@@ -296,6 +316,16 @@
 			</button>
 		{/if}
 	</div>
+
+	{#if disabledTools.size > 0}
+		<div
+			class="text-sm rounded border border-amber-400 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 px-4 py-3 mb-4"
+		>
+			Some tools are unavailable for your usage / license and will not run:
+			<b>{disabledToolNames.join(', ')}</b>. To change this, revoke your license above and
+			re-accept with updated answers.
+		</div>
+	{/if}
 
 	<!-- Workflow Selection -->
 	{#if availableWorkflows.length > 0}
