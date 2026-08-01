@@ -112,7 +112,16 @@
 			const res = await fetch(`${getApiUrl()}/v1/llm/chat`, {
 				method: 'POST',
 				headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-				body: JSON.stringify({ job_id: jobId, organism, question: q, stream: true })
+				// Send the recent turns so "it" / "that gene" resolve. Only the last
+				// few, and the server caps it again — an unbounded transcript would
+				// undo the prompt trimming and slow every answer back down.
+				body: JSON.stringify({
+					job_id: jobId,
+					organism,
+					question: q,
+					stream: true,
+					history: messages.slice(-7, -1).map((m) => ({ role: m.role, text: m.text }))
+				})
 			});
 			if (!res.ok) {
 				// Failures before the stream opens are still JSON.
