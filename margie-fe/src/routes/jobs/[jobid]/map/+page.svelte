@@ -151,7 +151,7 @@
 				class="h-full flex-1 rounded border border-surface-500/30 bg-white"
 				sandbox="allow-scripts allow-downloads"
 			></iframe>
-			<div class="hidden h-full w-[380px] shrink-0 lg:block">
+			<div class="hidden h-full w-[300px] shrink-0 xl:w-[340px] lg:block">
 				<ChatPanel {jobId} {organism} />
 			</div>
 		</div>

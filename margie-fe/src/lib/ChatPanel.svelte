@@ -161,15 +161,33 @@
 		}
 	}
 
+	// Render the small subset of markdown the answers actually use. Escaping
+	// happens FIRST and the allowed tags are then re-introduced, so model output
+	// can never inject markup -- this content is not trusted just because it came
+	// from our own backend.
+	function mdToHtml(src: string): string {
+		let h = esc(src);
+		// **bold** on its own line is a section heading (Answer, From the
+		// evidence, Interpretation, Not in the evidence).
+		h = h.replace(/^\s*\*\*(.+?)\*\*\s*$/gm, '<div class="ansh">$1</div>');
+		h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+		h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+		// Leading - or * becomes a bullet; kept as divs rather than <ul> so the
+		// regex cannot produce unbalanced list markup.
+		h = h.replace(/^\s*[-*]\s+(.*)$/gm, '<div class="ansli">$1</div>');
+		return h;
+	}
+
+	/** Escape for HTML text context. Shared by mdToHtml and the PDF export. */
+	function esc(s: string): string {
+		return s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] as string);
+	}
+
 	// PDF export via the browser's own print-to-PDF, deliberately: adding jsPDF
 	// or similar would mean a new dependency and a hand-rolled layout engine,
 	// and the browser already produces better typography, real text selection,
 	// and correct page breaks. Opens a self-contained formatted document and
 	// calls print(); the user picks "Save as PDF".
-	function esc(s: string): string {
-		return s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] as string);
-	}
-
 	function downloadPdf() {
 		if (messages.length === 0) return;
 		const when = new Date().toLocaleString();
@@ -188,7 +206,7 @@
 <title>MARGIE chat — ${esc(organism)}</title>
 <style>
   @page { margin: 20mm; }
-  body { font: 11pt/1.5 Calibri, Arial, sans-serif; color: #000; background: #fff; }
+  body { font: 11pt/1.5 'Times New Roman', Times, Georgia, serif; color: #000; background: #fff; }
   h1 { font-size: 15pt; margin: 0 0 2mm; }
   .meta { font-size: 9pt; color: #444; margin-bottom: 6mm;
           border-bottom: 1px solid #999; padding-bottom: 3mm; }
@@ -297,7 +315,12 @@ ${rows}
 			{#each messages as m}
 				<div class="text-sm">
 					<div class="text-xs font-semibold opacity-60">{m.role === 'you' ? 'You' : 'MARGIE'}</div>
-					<div class="whitespace-pre-wrap">{m.text}</div>
+					{#if m.role === 'margie'}
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+						<div class="ansbody">{@html mdToHtml(m.text)}</div>
+					{:else}
+						<div class="whitespace-pre-wrap">{m.text}</div>
+					{/if}
 				</div>
 			{/each}
 		</div>
@@ -342,7 +365,12 @@ ${rows}
 			{#each messages as m}
 				<div class="text-sm">
 					<div class="text-xs font-semibold opacity-60">{m.role === 'you' ? 'You' : 'MARGIE'}</div>
+					{#if m.role === 'margie'}
+					<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+					<div class="ansbody">{@html mdToHtml(m.text)}</div>
+				{:else}
 					<div class="whitespace-pre-wrap">{m.text}</div>
+				{/if}
 				</div>
 			{/each}
 			{#if busy}<p class="text-sm opacity-60">Thinking…</p>{/if}
@@ -363,3 +391,28 @@ ${rows}
 		<div class="border-t border-surface-500/30 px-3 py-2 text-xs text-error-500">{error}</div>
 	{/if}
 </div>
+
+<style>
+	/* Answers arrive as headed sections; give them real typographic structure
+	   instead of a wall of pre-wrap text with visible asterisks. */
+	.ansbody { white-space: pre-wrap; line-height: 1.45; }
+	.ansbody :global(.ansh) {
+		font-weight: 700;
+		margin: 0.6em 0 0.15em;
+		white-space: normal;
+	}
+	.ansbody :global(.ansh:first-child) { margin-top: 0; }
+	.ansbody :global(.ansli) {
+		padding-left: 1em;
+		text-indent: -0.6em;
+		white-space: normal;
+	}
+	.ansbody :global(.ansli)::before { content: "\2022  "; opacity: 0.6; }
+	.ansbody :global(code) {
+		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+		font-size: 0.92em;
+		padding: 0 0.2em;
+		background: rgba(127, 127, 127, 0.14);
+		border-radius: 3px;
+	}
+</style>
