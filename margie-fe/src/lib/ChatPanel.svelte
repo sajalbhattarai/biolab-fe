@@ -112,12 +112,37 @@
 			const res = await fetch(`${getApiUrl()}/v1/llm/chat`, {
 				method: 'POST',
 				headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-				body: JSON.stringify({ job_id: jobId, organism, question: q })
+				body: JSON.stringify({ job_id: jobId, organism, question: q, stream: true })
 			});
-			const body = await res.json().catch(() => ({}));
-			if (!res.ok) throw new Error(body.detail || `Chat failed (${res.status})`);
+			if (!res.ok) {
+				// Failures before the stream opens are still JSON.
+				const body = await res.json().catch(() => ({}));
+				throw new Error(body.detail || `Chat failed (${res.status})`);
+			}
+
+			// Append an empty turn and grow it as tokens arrive, so the answer is
+			// readable from the first word instead of after the whole generation.
 			messages = [...messages,
-				{ role: 'margie', text: body.answer || '(empty answer)', at: new Date().toISOString() }];
+				{ role: 'margie', text: '', at: new Date().toISOString() }];
+			const idx = messages.length - 1;
+
+			const reader = res.body?.getReader();
+			if (!reader) throw new Error('Streaming is not supported by this browser');
+			const dec = new TextDecoder();
+			let acc = '';
+			for (;;) {
+				const { value, done } = await reader.read();
+				if (done) break;
+				acc += dec.decode(value, { stream: true });
+				// Reassign the array, not the string, or Svelte will not see it.
+				const next = [...messages];
+				next[idx] = { ...next[idx], text: acc };
+				messages = next;
+			}
+			acc += dec.decode();
+			const settled = [...messages];
+			settled[idx] = { ...settled[idx], text: acc || '(empty answer)' };
+			messages = settled;
 			saveHistory();
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Chat failed';
