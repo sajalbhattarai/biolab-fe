@@ -53,10 +53,28 @@ row() {
 # ---------------------------------------------------------------------------
 # Shut everything down cleanly on exit
 # ---------------------------------------------------------------------------
+# Shut the session down on exit: front-end, tunnel, and every dane-api of ours
+# on the node we were using.
+#
+# CRITICAL BOUNDARY: this must NOT touch dane_wf. Workflow runs are started
+# detached (setsid + nohup) precisely so they survive the GUI closing -- an
+# annotation runs for hours and killing the driver would silently stall it
+# half-finished. The pattern below matches 'bin/dane-api' only; dane_wf's
+# command line does not contain that string, so it is never selected. Do not
+# loosen this to 'dane' or 'python'.
+#
+# Killing BE_PID alone was not enough: if the launcher reused an already-running
+# backend (verdict "ours"), BE_PID is the pid of the second server that failed to
+# bind and died, so the real one was left orphaned holding port 8000.
 cleanup() {
     [ -n "${FE_PID:-}" ]  && kill "$FE_PID"  2>/dev/null
     [ -n "${TUN_PID:-}" ] && kill "$TUN_PID" 2>/dev/null
-    [ -n "${BE_PID:-}" ]  && ssh -S "$SOCKET" -o BatchMode=yes "$HPC_HOST" "kill $BE_PID 2>/dev/null" 2>/dev/null
+    if [ -S "$SOCKET" ]; then
+        ssh -S "$SOCKET" -o BatchMode=yes "$HPC_HOST" "
+            pkill -u \$USER -f 'bin/dane-api' 2>/dev/null
+            rm -f \$HOME/.local/share/bsp/api-endpoint.json
+        " >/dev/null 2>&1 || true
+    fi
     ssh -S "$SOCKET" -O exit "$HPC_HOST" 2>/dev/null || true
 }
 trap cleanup INT TERM EXIT
@@ -64,6 +82,31 @@ trap cleanup INT TERM EXIT
 section "MARGIE"
 row "HPC host"  "$HPC_HOST"
 row "Front-end" "$REPO"
+
+# ---------------------------------------------------------------------------
+# What kind of launch?
+#
+# Non-interactive (no tty, or MARGIE_MODE set) defaults to 1, so this stays
+# usable from a script or a CI job without hanging on a read.
+# ---------------------------------------------------------------------------
+MODE="${MARGIE_MODE:-}"
+if [ -z "$MODE" ]; then
+    if [ -t 0 ]; then
+        echo
+        echo "  1) Relaunch MARGIE          — reuse a healthy backend if one is already up"
+        echo "  2) Clean restart            — close YOUR remote sessions on every login"
+        echo "                                node first, then start everything fresh"
+        echo
+        printf "  Choose [1]: "
+        read -r MODE || MODE=1
+    else
+        MODE=1
+    fi
+fi
+case "${MODE:-1}" in
+    2) MODE=2; row "mode" "clean restart (close all my remote sessions first)" ;;
+    *) MODE=1; row "mode" "relaunch" ;;
+esac
 
 # ---------------------------------------------------------------------------
 # Free local ports left over from a previous run
@@ -106,6 +149,39 @@ section "Backend (on the HPC)"
 # kill it at source. This is exact -- no hardcoded list of login node names to
 # drift out of date -- and it costs one SSH.
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Mode 2: close this user's backend processes on EVERY login node.
+#
+# Scoped to `-u $USER` and the dane-api entrypoint, so another user's work is
+# never touched -- these are shared login nodes and that boundary matters.
+#
+# The node list is probed rather than assumed: each candidate gets a short
+# BatchMode ssh and is skipped if unreachable, so a cluster with a different
+# number of login nodes degrades quietly instead of erroring.
+# ---------------------------------------------------------------------------
+if [ "$MODE" = 2 ]; then
+    section "Closing my remote sessions"
+    _user="${HPC_HOST%%@*}"
+    _dom="${HPC_HOST##*@}"
+    killed=0
+    for nn in 00 01 02 03 04 05 06 07 08 09; do
+        node="login${nn}"
+        out="$(ssh -o BatchMode=yes -o ConnectTimeout=6 -o StrictHostKeyChecking=no \
+               "${_user}@${node}.${_dom}" "
+                   n=\$(pgrep -u \$USER -f 'bin/dane-api' 2>/dev/null | wc -l)
+                   pkill -u \$USER -f 'bin/dane-api' 2>/dev/null
+                   echo \$n
+               " 2>/dev/null)" || continue
+        case "$out" in
+            ''|*[!0-9]*) continue ;;                 # unreachable / odd reply
+        esac
+        [ "$out" -gt 0 ] && { row "$node" "closed $out"; killed=$((killed + out)); }
+    done
+    ssh -o BatchMode=yes -o ConnectTimeout=10 "$HPC_HOST" \
+        "rm -f \$HOME/.local/share/bsp/api-endpoint.json" >/dev/null 2>&1 || true
+    row "total closed" "$killed"
+fi
+
 section "Previous backend"
 ADVERT=".local/share/bsp/api-endpoint.json"
 prev="$(ssh -o BatchMode=yes -o ConnectTimeout=15 "$HPC_HOST" \
@@ -269,10 +345,29 @@ fi
 section "Tunnel"
 ssh -S "$SOCKET" -o ExitOnForwardFailure=yes -N -L 8000:localhost:8000 "$HPC_HOST" &
 TUN_PID=$!
+
+# The loop here used to `break` on success and then fall through regardless, so
+# an exhausted wait started the front-end anyway and the browser opened onto a
+# dead tunnel. It is now a gate: reachable AND identifiably ours, or we stop.
+printf '  verifying tunnel'
+tunnel_ok="no"
 for i in $(seq 1 30); do
-    curl -fsS "$API_URL" >/dev/null 2>&1 && break
+    if curl -fsS --max-time 5 "$API_URL/openapi.json" 2>/dev/null | grep -q '/v1/ssh/'; then
+        printf ' ok\n'
+        tunnel_ok="yes"
+        break
+    fi
+    printf '.'
     sleep 1
 done
+if [ "$tunnel_ok" != "yes" ]; then
+    printf '\n'
+    echo "  The tunnel is up but MARGIE's API is not answering through it."
+    echo "  Not opening the front-end -- it would show connection errors."
+    echo "  Backend log on $NODE:"
+    ssh -S "$SOCKET" "$HPC_HOST" "tail -n 20 $REMOTE_LOG 2>/dev/null" | sed 's/^/    /'
+    exit 1
+fi
 row "API" "$API_URL"
 
 # ---------------------------------------------------------------------------
@@ -283,10 +378,31 @@ cd "$REPO"
 npm install >/dev/null 2>&1
 npm run dev > "$VITE_LOG" 2>&1 &
 FE_PID=$!
+printf '  starting vite'
+fe_ok="no"
 for i in $(seq 1 60); do
-    grep -q "Local:" "$VITE_LOG" && break
+    if grep -q "Local:" "$VITE_LOG" 2>/dev/null; then
+        printf ' ok\n'; fe_ok="yes"; break
+    fi
+    # If the dev server died, stop waiting the full minute for nothing.
+    kill -0 "$FE_PID" 2>/dev/null || break
+    printf '.'
     sleep 1
 done
+if [ "$fe_ok" != "yes" ]; then
+    printf '\n'
+    echo "  The front-end dev server did not start. Last lines of its log:"
+    tail -n 20 "$VITE_LOG" 2>/dev/null | sed 's/^/    /'
+    exit 1
+fi
+
+# Final check before handing over a URL: the browser must not be pointed at a
+# stack that is only partly up.
+if ! curl -fsS --max-time 5 "$API_URL/openapi.json" 2>/dev/null | grep -q '/v1/ssh/'; then
+    echo "  The API stopped answering while the front-end was starting."
+    echo "  Not opening the browser."
+    exit 1
+fi
 
 # ---------------------------------------------------------------------------
 # Ready
