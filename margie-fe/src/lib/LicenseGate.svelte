@@ -103,14 +103,32 @@
 			This decides which license-restricted tools are available to you.
 		</p>
 		<div class="space-y-2 mb-5">
+			{#if (terms.usage_types ?? []).length === 0}
+				<!-- Without this the section renders as a blank gap and the Accept
+				     button is unblockable, with nothing on screen explaining why. -->
+				<div class="bg-red-100 border border-red-400 text-red-700 px-3 py-2 rounded text-sm">
+					The server sent no usage types, so this cannot be answered and
+					acceptance cannot proceed. This is a backend/catalog problem —
+					please report it rather than retrying.
+				</div>
+			{/if}
 			{#each terms.usage_types as u (u.id)}
 				<label class="flex items-start gap-2 cursor-pointer text-sm">
+					<!--
+						Explicit checked + onchange rather than bind:group. These
+						radios live in a KEYED {#each}, where bind:group is a known
+						Svelte 5 failure mode: the group can fail to register, so
+						clicking a radio never writes usageType back and the Accept
+						button stays disabled with no way for the user to unblock it.
+						One-way checked + an explicit handler has no such dependency.
+					-->
 					<input
 						type="radio"
 						class="mt-1"
 						name="usage_type"
 						value={u.id}
-						bind:group={usageType}
+						checked={usageType === u.id}
+						onchange={() => (usageType = u.id)}
 					/>
 					<span>{u.label}</span>
 				</label>
