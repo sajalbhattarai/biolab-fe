@@ -243,10 +243,23 @@ while [ "$attempt" -lt 6 ]; do
     NODE="$(ssh -S "$SOCKET" "$HPC_HOST" hostname 2>/dev/null)"
 
     # Is 8000 free, ours already, or somebody else's?
+    # free  : nothing on 8000 -- we can bind
+    # ours  : OUR OWN dane-api is already there
+    # taken : occupied by someone/something else -- move to another node
+    #
+    # Ownership matters on a shared login node. An earlier version decided "ours"
+    # from openapi.json alone, but that is true of ANY user's MARGIE backend --
+    # so a second user landing here would reuse the first user's server, read the
+    # first user's account database, and lose their session the moment that user
+    # quit. Ownership is established two ways, both of which require the process
+    # to be ours: `ss -ltnp` only prints pid= for your own sockets, and pgrep -u
+    # only matches your own processes.
     verdict="$(ssh -S "$SOCKET" "$HPC_HOST" '
         if ! ss -ltn 2>/dev/null | grep -q ":8000 "; then
             echo free
-        elif curl -fsS --max-time 5 http://localhost:8000/openapi.json 2>/dev/null | grep -q "/v1/ssh/"; then
+        elif ss -ltnp 2>/dev/null | grep ":8000 " | grep -q "pid=" \
+             && pgrep -u "$USER" -f "bin/dane-api" >/dev/null 2>&1 \
+             && curl -fsS --max-time 5 http://localhost:8000/openapi.json 2>/dev/null | grep -q "/v1/ssh/"; then
             echo ours
         else
             echo taken
@@ -270,10 +283,15 @@ done
 
 if [ -z "$NODE" ]; then
     echo
-    echo "  Port 8000 is occupied by another service on every login node tried."
-    echo "  Nothing MARGIE can do from here: the port is fixed, and the process"
-    echo "  holding it is not ours. Try again later, or ask RCAC which service"
-    echo "  is bound to 8000 on the negishi login nodes."
+    echo "  Port 8000 is already in use on every login node tried, by a process"
+    echo "  that is not yours. The port is fixed, so MARGIE cannot work around it."
+    echo
+    echo "  The usual cause is other people running MARGIE at the same time:"
+    echo "  the backend port is per-node, so only one user per login node can"
+    echo "  hold it. With N login nodes, N users can run concurrently."
+    echo
+    echo "  Try again shortly, or check what is holding it:"
+    echo "    ssh $HPC_HOST 'ss -ltnp | grep :8000'"
     exit 1
 fi
 
