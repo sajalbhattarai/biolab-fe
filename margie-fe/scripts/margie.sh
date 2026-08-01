@@ -93,19 +93,71 @@ echo "VITE_PUBLIC_API_URL=$API_URL" > "$REPO/.env"
 # Start the backend on the HPC (uv sync -> activate -> dane-api)
 # ---------------------------------------------------------------------------
 section "Backend (on the HPC)"
-rm -f "$SOCKET"
-# One authenticated master connection; everything below reuses it. If this
-# fails, stop immediately instead of re-prompting for every later SSH call.
-if ! ssh -M -S "$SOCKET" -o ConnectTimeout=15 -fN "$HPC_HOST"; then
+# ---------------------------------------------------------------------------
+# Connect, and make sure we land on a node where port 8000 is actually ours.
+#
+# Login nodes are shared and 8000 is a popular port. If something else already
+# holds it, uvicorn cannot bind, dane-api dies, and the tunnel then forwards
+# every request into whatever IS listening -- which answers 404 for our routes.
+# That failure is silent and looks exactly like a stale backend or a bad pull.
+# (Seen in practice: a "HarnessWeb / OrgFlow" service on one node returning
+# {"error": "not found"} for every /v1/... path.)
+#
+# The port is deliberately NOT changed -- it is the agreed backend port. Instead
+# we detect the collision and reconnect: ssh to the cluster address round-robins
+# across login nodes, so a fresh master connection usually lands elsewhere.
+# ---------------------------------------------------------------------------
+attempt=0
+NODE=""
+while [ "$attempt" -lt 6 ]; do
+    attempt=$((attempt + 1))
+    rm -f "$SOCKET"
+    # One authenticated master connection; everything below reuses it. If this
+    # fails, stop immediately instead of re-prompting for every later SSH call.
+    if ! ssh -M -S "$SOCKET" -o ConnectTimeout=15 -fN "$HPC_HOST"; then
+        echo
+        echo "  Could not connect to '$HPC_HOST'."
+        echo "  Check it is <your-hpc-username>@<your-hpc-address> and that you can SSH in,"
+        echo "  then fix the top of ~/bin/margie (or re-run setup) and try again."
+        exit 1
+    fi
+
+    NODE="$(ssh -S "$SOCKET" "$HPC_HOST" hostname 2>/dev/null)"
+
+    # Is 8000 free, ours already, or somebody else's?
+    verdict="$(ssh -S "$SOCKET" "$HPC_HOST" '
+        if ! ss -ltn 2>/dev/null | grep -q ":8000 "; then
+            echo free
+        elif curl -fsS --max-time 5 http://localhost:8000/openapi.json 2>/dev/null | grep -q "/v1/ssh/"; then
+            echo ours
+        else
+            echo taken
+        fi' 2>/dev/null)"
+
+    case "$verdict" in
+        free|ours)
+            row "node" "$NODE"
+            [ "$verdict" = ours ] && row "backend" "already running on this node"
+            break
+            ;;
+        *)
+            row "node" "$NODE  — port 8000 in use by another service"
+            echo "    retrying on a different login node ($attempt/6)…"
+            ssh -S "$SOCKET" -O exit "$HPC_HOST" 2>/dev/null || true
+            NODE=""
+            sleep 1
+            ;;
+    esac
+done
+
+if [ -z "$NODE" ]; then
     echo
-    echo "  Could not connect to '$HPC_HOST'."
-    echo "  Check it is <your-hpc-username>@<your-hpc-address> and that you can SSH in,"
-    echo "  then fix the top of ~/bin/margie (or re-run setup) and try again."
+    echo "  Port 8000 is occupied by another service on every login node tried."
+    echo "  Nothing MARGIE can do from here: the port is fixed, and the process"
+    echo "  holding it is not ours. Try again later, or ask RCAC which service"
+    echo "  is bound to 8000 on the negishi login nodes."
     exit 1
 fi
-
-NODE="$(ssh -S "$SOCKET" "$HPC_HOST" hostname 2>/dev/null)"
-row "node" "$NODE"
 
 # Prepare the environment on the HPC -- errors are shown (not hidden), so a wrong
 # BACKEND_DIR or a uv failure is obvious instead of a silent missing venv.
@@ -139,7 +191,11 @@ row "dane-api pid" "$BE_PID"
 printf '  waiting for backend'
 backend_ready="no"
 for i in $(seq 1 60); do
-    if ssh -S "$SOCKET" "$HPC_HOST" "curl -fsS http://localhost:8000 >/dev/null 2>&1"; then
+    # Assert it is OUR api, not merely "something answers on 8000". A bare
+    # reachability check is what allowed an unrelated service to be mistaken
+    # for the backend and reported as READY.
+    if ssh -S "$SOCKET" "$HPC_HOST" \
+        "curl -fsS --max-time 5 http://localhost:8000/openapi.json 2>/dev/null | grep -q '/v1/ssh/'"; then
         printf ' ready\n'
         backend_ready="yes"
         break
@@ -151,8 +207,11 @@ if [ "$backend_ready" != "yes" ]; then
     printf '\n'
     echo "  dane-api did not start. Last lines of its log:"
     ssh -S "$SOCKET" "$HPC_HOST" "tail -n 20 $REMOTE_LOG 2>/dev/null" | sed 's/^/    /'
-    echo "  A common cause: the backend has no .env with BSP_SECRET_KEY / BSP_ENCRYPTION_KEY"
-    echo "  (see the backend's README / docs/LOCAL_DEV.md)."
+    echo "  Two common causes:"
+    echo "   * no .env with BSP_SECRET_KEY / BSP_ENCRYPTION_KEY"
+    echo "     (see the backend's README / docs/LOCAL_DEV.md)"
+    echo "   * port 8000 taken on this login node, so uvicorn could not bind."
+    echo "     Check with:  ssh $HPC_HOST 'ss -ltnp | grep :8000'"
     exit 1
 fi
 
