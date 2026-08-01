@@ -196,6 +196,70 @@
 		}
 	}
 
+	// Expand-in-place tree. navigateToDir used to REPLACE the listing, so seeing
+	// two organisms' outputs meant walking out and back in. Children are fetched
+	// once per folder and cached; expanding again is instant.
+	let expanded = $state<Set<string>>(new Set());
+	let childCache = $state<Record<string, FileEntry[]>>({});
+	let loadingDirs = $state<Set<string>>(new Set());
+
+	function joinPath(base: string, name: string) {
+		return base ? `${base}/${name}` : name;
+	}
+
+	async function loadDir(path: string): Promise<FileEntry[]> {
+		if (childCache[path]) return childCache[path];
+		loadingDirs = new Set([...loadingDirs, path]);
+		try {
+			const apiUrl = getApiUrl();
+			const params = path ? `?subdir=${encodeURIComponent(path)}` : '';
+			const res = await fetch(`${apiUrl}/v1/ssh/job_files/${jobId}${params}`, { headers: authHeaders() });
+			if (res.status === 401) { handle401(); return []; }
+			if (!res.ok) throw new Error('Failed to list files');
+			const data = await res.json();
+			childCache = { ...childCache, [path]: data.entries };
+			return data.entries;
+		} catch (e) {
+			filesError = e instanceof Error ? e.message : 'Failed to list files';
+			return [];
+		} finally {
+			const n = new Set(loadingDirs); n.delete(path); loadingDirs = n;
+		}
+	}
+
+	async function toggleDir(path: string) {
+		if (expanded.has(path)) {
+			const n = new Set(expanded); n.delete(path); expanded = n;
+			return;
+		}
+		await loadDir(path);
+		expanded = new Set([...expanded, path]);
+	}
+
+	/** Re-fetch every folder currently open, so Refresh updates the whole tree. */
+	async function refreshTree() {
+		childCache = {};
+		await fetchJobFiles(currentSubdir);
+		for (const path of [...expanded]) await loadDir(path);
+	}
+
+	// Flattened view of the open tree: the existing flat markup is reused, with
+	// depth driving indentation. Cheaper and far less risky than a recursive
+	// snippet rewrite of the whole block.
+	type Row = { entry: FileEntry; path: string; depth: number };
+	function flatten(entries: FileEntry[], base: string, depth: number): Row[] {
+		const out: Row[] = [];
+		for (const entry of entries) {
+			const path = joinPath(base, entry.name);
+			out.push({ entry, path, depth });
+			if (entry.type === 'directory' && expanded.has(path)) {
+				out.push(...flatten(childCache[path] ?? [], path, depth + 1));
+			}
+		}
+		return out;
+	}
+	const fileRows = $derived(flatten(outputFiles, currentSubdir, 0));
+
 	async function fetchJobFiles(subdir = '') {
 		if (!job?.work_dir) return;
 		filesLoading = true;
@@ -235,13 +299,15 @@
 
 	async function downloadFile(fileName: string) {
 		const apiUrl = getApiUrl();
-		const relativePath = currentSubdir ? `${currentSubdir}/${fileName}` : fileName;
+		// fileName is already a path relative to the job root (the tree may be
+		// several levels deep), so it must NOT be prefixed again.
+		const relativePath = fileName;
 		const url = `${apiUrl}/v1/ssh/download_file/${jobId}?path=${encodeURIComponent(relativePath)}`;
 		try {
 			const res = await fetch(url, { headers: authHeaders() });
 			if (res.status === 401) { handle401(); return; }
 			if (!res.ok) { filesError = 'Download failed'; return; }
-			saveBlob(await res.blob(), fileName);
+			saveBlob(await res.blob(), fileName.split('/').pop() || fileName);
 		} catch (e) {
 			filesError = e instanceof Error ? e.message : 'Download failed';
 		}
@@ -249,7 +315,9 @@
 
 	async function downloadFileAsExcel(fileName: string) {
 		const apiUrl = getApiUrl();
-		const relativePath = currentSubdir ? `${currentSubdir}/${fileName}` : fileName;
+		// fileName is already a path relative to the job root (the tree may be
+		// several levels deep), so it must NOT be prefixed again.
+		const relativePath = fileName;
 		const xlsxName = fileName.replace(/\.(tsv|csv)$/i, '.xlsx');
 		const url = `${apiUrl}/v1/ssh/download_file/${jobId}?path=${encodeURIComponent(relativePath)}&format=excel`;
 		try {
@@ -287,7 +355,9 @@
 	}
 
 	function genomeMapHref(fileName: string): string {
-		const relativePath = currentSubdir ? `${currentSubdir}/${fileName}` : fileName;
+		// fileName is already a path relative to the job root (the tree may be
+		// several levels deep), so it must NOT be prefixed again.
+		const relativePath = fileName;
 		// currentSubdir is the organism folder when browsing per-organism output.
 		const organism = currentSubdir ? currentSubdir.split('/').pop()! : '';
 		return `/jobs/${jobId}/map?path=${encodeURIComponent(relativePath)}`
@@ -295,7 +365,9 @@
 	}
 
 	function launchViewerTab(fileName: string) {
-		const relativePath = currentSubdir ? `${currentSubdir}/${fileName}` : fileName;
+		// fileName is already a path relative to the job root (the tree may be
+		// several levels deep), so it must NOT be prefixed again.
+		const relativePath = fileName;
 		window.open(`/jobs/${jobId}/view?path=${encodeURIComponent(relativePath)}`, '_blank');
 	}
 
@@ -312,10 +384,6 @@
 		pendingLargeFile = null;
 	}
 
-	function navigateToDir(dirName: string) {
-		const newSubdir = currentSubdir ? `${currentSubdir}/${dirName}` : dirName;
-		fetchJobFiles(newSubdir);
-	}
 
 	function navigateUp() {
 		const parts = currentSubdir.split('/').filter(Boolean);
@@ -744,7 +812,7 @@
 					</button>
 					<button
 						type="button"
-						onclick={() => fetchJobFiles(currentSubdir)}
+						onclick={refreshTree}
 						disabled={filesLoading}
 						class="text-xs text-primary-500 hover:text-primary-400 px-2 py-1 rounded border border-primary-500/30 hover:border-primary-400 transition-colors disabled:opacity-50"
 						title="Refresh file listing"
@@ -832,21 +900,30 @@
 					<p class="text-surface-500">Loading files...</p>
 				{:else if outputFiles.length > 0}
 					<div class="space-y-1 overflow-y-auto h-60 min-h-[120px] max-h-[80vh] rounded border border-surface-300 dark:border-surface-600 p-2 pr-3">
-						{#each outputFiles as entry}
+						{#each fileRows as { entry, path, depth } (path)}
 							{#if entry.type === 'directory'}
 								<button
 									type="button"
-									onclick={() => navigateToDir(entry.name)}
+									onclick={() => toggleDir(path)}
+									aria-expanded={expanded.has(path)}
+									style="margin-left:{depth * 14}px"
 									class="flex items-center justify-between px-3 py-2 rounded bg-surface-200 dark:bg-surface-700 hover:bg-surface-300 dark:hover:bg-surface-600 w-full text-left"
 								>
 									<div class="flex items-center gap-2">
+										<span class="inline-block w-3 text-surface-400">
+											{loadingDirs.has(path) ? '⋯' : expanded.has(path) ? '▾' : '▸'}
+										</span>
 										<span class="text-yellow-500">&#128193;</span>
 										<span class="font-mono text-sm">{entry.name}/</span>
 									</div>
 								</button>
 							{:else}
-								<div class="flex items-center justify-between px-3 py-2 rounded bg-surface-200 dark:bg-surface-700">
+								<div
+									style="margin-left:{depth * 14}px"
+									class="flex items-center justify-between px-3 py-2 rounded bg-surface-200 dark:bg-surface-700"
+								>
 									<div class="flex items-center gap-2">
+										<span class="inline-block w-3"></span>
 										<span class="text-surface-400">&#128196;</span>
 										<span class="font-mono text-sm">{entry.name}</span>
 									</div>
@@ -854,7 +931,7 @@
 										<span class="text-xs text-surface-400">{formatFileSize(entry.size)}</span>
 										{#if isGenomeViewer(entry.name)}
 											<a
-												href={genomeMapHref(entry.name)}
+												href={genomeMapHref(path)}
 												class="text-xs font-semibold text-tertiary-500 hover:text-tertiary-400"
 												title="Open the interactive genome / operon map"
 											>Open map</a>
@@ -862,21 +939,21 @@
 										{#if isViewable(entry.name)}
 											<button
 												type="button"
-												onclick={() => openViewer(entry)}
+												onclick={() => openViewer({ ...entry, name: path })}
 												class="text-xs text-primary-500 hover:text-primary-400"
 											>View</button>
 										{/if}
 										{#if isTabular(entry.name)}
 											<button
 												type="button"
-												onclick={() => downloadFileAsExcel(entry.name)}
+												onclick={() => downloadFileAsExcel(path)}
 												class="text-xs text-green-500 hover:text-green-400 font-semibold"
 												title="Download as Excel with tier coloring"
 											>Excel</button>
 										{/if}
 										<button
 											type="button"
-											onclick={() => downloadFile(entry.name)}
+											onclick={() => downloadFile(path)}
 											class="text-xs text-primary-500 hover:text-primary-400"
 										>Download</button>
 									</div>
