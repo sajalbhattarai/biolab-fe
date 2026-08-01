@@ -7,6 +7,17 @@
 @import '@skeletonlabs/skeleton/themes/vintage';
 @import '@skeletonlabs/skeleton/themes/seafoam';
 
+/* Global type scale.
+   Requested: everything one point smaller, except the already-tiny text.
+   Done at the root rather than by rewriting ~430 Tailwind classes: those steps
+   are 2-4px apart, so text-sm -> text-xs would drop body text by 2px, not one.
+   Tailwind sizes are rem-based, so moving the root from 16px to 15px scales the
+   whole scale down proportionally and keeps the hierarchy intact.
+   text-xs is then pinned back to 12px -- that is the tiny label/caption text
+   the user asked to leave alone, and it does not survive another point. */
+html { font-size: 15px; }
+.text-xs { font-size: 12px; line-height: 1.35; }
+
 :root {
 	--app-bg-a: #f7fbf8;
 	--app-bg-b: #eef6ff;
