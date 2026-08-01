@@ -3,6 +3,7 @@
 	import { onDestroy, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { authHeaders, clearToken } from '$lib/auth.js';
+	import ChatPanel from '$lib/ChatPanel.svelte';
 
 	function getApiUrl() {
 		if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
@@ -132,16 +133,27 @@
 		<div class="alert variant-filled-warning">{error}</div>
 	{:else if blobUrl}
 		<!--
-			sandbox WITHOUT allow-same-origin: the frame gets an opaque origin, so
-			the viewer's inline scripts run but cannot reach this app's token,
-			storage, or cookies. allow-downloads is required or the operon card's
-			"⤓ map" button silently no-ops inside the frame.
+			The chat is a SIBLING of the iframe, never inside it. The sandbox below
+			omits allow-same-origin, so the frame has an opaque origin and code in
+			it could not make an authenticated API call even if we wanted it to.
+			A native sibling has no such limitation.
 		-->
-		<iframe
-			src={blobUrl}
-			title="Interactive genome map for {organism}"
-			class="flex-1 w-full rounded border border-surface-500/30 bg-white"
-			sandbox="allow-scripts allow-downloads"
-		></iframe>
+		<div class="flex flex-1 gap-3 overflow-hidden">
+			<!--
+				sandbox WITHOUT allow-same-origin: the viewer's inline scripts run
+				but cannot reach this app's token, storage, or cookies.
+				allow-downloads is required or the operon card's "⤓ map" button
+				silently no-ops inside the frame.
+			-->
+			<iframe
+				src={blobUrl}
+				title="Interactive genome map for {organism}"
+				class="h-full flex-1 rounded border border-surface-500/30 bg-white"
+				sandbox="allow-scripts allow-downloads"
+			></iframe>
+			<div class="hidden h-full w-[380px] shrink-0 lg:block">
+				<ChatPanel {jobId} {organism} />
+			</div>
+		</div>
 	{/if}
 </div>
