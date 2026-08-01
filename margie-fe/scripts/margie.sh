@@ -94,6 +94,48 @@ echo "VITE_PUBLIC_API_URL=$API_URL" > "$REPO/.env"
 # ---------------------------------------------------------------------------
 section "Backend (on the HPC)"
 # ---------------------------------------------------------------------------
+# Terminate any previous dane-api first, wherever on the cluster it is.
+#
+# An abandoned dane-api holds port 8000 on whichever login node it was started
+# on. ssh to the cluster address round-robins, so the next launch usually lands
+# elsewhere and never sees it -- processes have been found still holding the port
+# 26 days after their session ended, and each one makes that node unusable.
+#
+# The API records its host and pid in ~/.local/share/bsp/api-endpoint.json on
+# startup ($HOME is shared across login nodes; /tmp is not). We read that and
+# kill it at source. This is exact -- no hardcoded list of login node names to
+# drift out of date -- and it costs one SSH.
+# ---------------------------------------------------------------------------
+section "Previous backend"
+ADVERT=".local/share/bsp/api-endpoint.json"
+prev="$(ssh -o BatchMode=yes -o ConnectTimeout=15 "$HPC_HOST" \
+        "cat \$HOME/$ADVERT 2>/dev/null" 2>/dev/null)"
+
+if [ -z "$prev" ]; then
+    row "previous" "none recorded"
+else
+    prev_host="$(printf '%s' "$prev" | sed -n 's/.*"host": *"\([^"]*\)".*/\1/p')"
+    prev_pid="$(printf '%s' "$prev" | sed -n 's/.*"pid": *\([0-9]*\).*/\1/p')"
+    if [ -n "$prev_host" ] && [ -n "$prev_pid" ]; then
+        row "found" "pid $prev_pid on ${prev_host%%.*}"
+        # Reach that specific node. ssh to the cluster address would round-robin
+        # and probably miss it, so the recorded hostname is used directly.
+        ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=no \
+            "${HPC_HOST%%@*}@$prev_host" "
+                kill $prev_pid 2>/dev/null
+                sleep 2
+                kill -0 $prev_pid 2>/dev/null && kill -9 $prev_pid 2>/dev/null
+                # Sweep this node for any other stray dane-api of ours, then drop
+                # the advert so a failed kill cannot leave a phantom entry.
+                pkill -u \$USER -f 'bin/dane-api' 2>/dev/null
+                rm -f \$HOME/$ADVERT
+            " >/dev/null 2>&1 && row "terminated" "yes" || row "terminated" "could not reach ${prev_host%%.*}"
+    else
+        row "previous" "advert unreadable — ignoring"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
 # Connect, and make sure we land on a node where port 8000 is actually ours.
 #
 # Login nodes are shared and 8000 is a popular port. If something else already
@@ -179,6 +221,12 @@ if ! ssh -S "$SOCKET" "$HPC_HOST" "
     echo "  Backend could not be prepared on the HPC. Fix the above, then re-run."
     exit 1
 fi
+
+# Belt and braces: clear any dane-api of ours on THIS node before starting.
+# The advert-based kill above only finds processes that recorded themselves, so
+# it misses anything started by an older build -- and a leftover here would stop
+# the new one binding, leaving the tunnel pointed at the stale process.
+ssh -S "$SOCKET" "$HPC_HOST" "pkill -u \$USER -f 'bin/dane-api' 2>/dev/null; sleep 1" >/dev/null 2>&1 || true
 
 BE_PID="$(ssh -S "$SOCKET" "$HPC_HOST" "
     cd '$BACKEND_DIR' || exit 1
