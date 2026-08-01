@@ -329,7 +329,7 @@ ${rows}
 				</p>
 			{/if}
 			<p class="text-xs opacity-50">
-				The session ends automatically when you leave this page, or after 30 minutes idle.
+				The session ends automatically when you leave this page, or after about 5 minutes idle.
 			</p>
 		</div>
 	{:else}
