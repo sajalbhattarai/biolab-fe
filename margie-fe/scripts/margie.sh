@@ -27,7 +27,16 @@ API_URL="http://localhost:8000"
 # Per-user log paths so a leftover file owned by someone else can't block us
 # ($TMPDIR is private per-user on macOS; falls back to /tmp elsewhere).
 VITE_LOG="${TMPDIR:-/tmp}/margie-vite-$USER.log"
-REMOTE_LOG="/tmp/margie-dane-api-$USER.log"
+# REMOTE paths must be named after the REMOTE account, not the local one.
+# $USER expands on this laptop, so the log was landing on the cluster as
+# margie-dane-api-<mac-username>.log under an HPC account with a different name
+# -- confusing, and unsafe with several people: two users whose laptop accounts
+# happen to match (both "admin", say) would collide on a shared login node's
+# /tmp, while their actual HPC accounts differ. Deriving it from HPC_HOST makes
+# the filename match the account that owns the file and unique per HPC user.
+HPC_USER="${HPC_HOST%%@*}"
+REMOTE_LOG="/tmp/margie-dane-api-$HPC_USER.log"
+# Local socket: keeps the LOCAL user, since it lives on this laptop.
 SOCKET="/tmp/margie-$HPC_HOST-$USER.sock"
 
 # ---------------------------------------------------------------------------

@@ -28,6 +28,8 @@
 	let credentialsError = $state('');
 	let credentialsSuccess = $state('');
 	let connected = $state(false);
+	let connDetail = $state('');
+	let connAction = $state('');
 	let checking = $state(true);
 	// rasttk is the only true hard dependency: its rule always needs
 	// GTDB-Tk's real classification (domain + genetic code) as an input
@@ -110,7 +112,13 @@
 			if (!res.ok) throw new Error('Could not reach backend');
 			const data = await res.json();
 			connected = data.connected;
+			// The backend now says WHY it failed. Keep it, or the UI reduces a
+			// precisely-diagnosed problem back to "could not connect" -- which is
+			// what made an undecryptable stored key so hard to identify.
+			connDetail = data.detail ?? '';
+			connAction = data.action ?? '';
 			if (connected) {
+				connDetail = ''; connAction = '';
 				await loadConfig();
 			}
 		} catch (e) {
@@ -491,9 +499,19 @@
 				<span class="inline-block w-2.5 h-2.5 rounded-full bg-red-500"></span>
 				<span class="text-sm text-red-700 dark:text-red-400 font-semibold">Could not connect to {user?.cluster_host}</span>
 			</div>
-			<div class="mt-2 text-sm text-surface-500 leading-snug">
-				Update cluster host, username, or SSH key under Cluster Credentials, then retry.
-			</div>
+			{#if connDetail}
+				<p class="mt-2 text-sm text-red-700 dark:text-red-400">{connDetail}</p>
+			{/if}
+			{#if connAction === 're-register'}
+				<!-- Fernet is authenticated encryption: without the original key the
+				     stored credential is unrecoverable, so re-registering really is
+				     the only way forward. Say so, and link there. -->
+				<a href="/register" class="btn variant-filled-primary btn-sm mt-3 inline-block">Register a new account</a>
+			{:else}
+				<div class="mt-2 text-sm text-surface-500 leading-snug">
+					Update cluster host, username, or SSH key under Cluster Credentials, then retry.
+				</div>
+			{/if}
 			<button type="button" onclick={checkConnection} class="btn variant-outline-primary mt-3 px-4 py-2 text-sm">
 				Retry
 			</button>
