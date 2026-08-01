@@ -278,6 +278,22 @@
 		return isTabular(name) || isImage(name);
 	}
 
+	// The self-contained interactive genome/operon map written at the organism
+	// top level by the pipeline's run_genome_viewer_one_genome rule. Matched by
+	// name rather than extension: it is not a generic .html preview, it gets its
+	// own sandboxed route. Older suffixed names are accepted too.
+	function isGenomeViewer(name: string): boolean {
+		return name === 'FINAL_GENOME_VIEWER.html' || /_genome_viewer\.html$/i.test(name);
+	}
+
+	function genomeMapHref(fileName: string): string {
+		const relativePath = currentSubdir ? `${currentSubdir}/${fileName}` : fileName;
+		// currentSubdir is the organism folder when browsing per-organism output.
+		const organism = currentSubdir ? currentSubdir.split('/').pop()! : '';
+		return `/jobs/${jobId}/map?path=${encodeURIComponent(relativePath)}`
+			+ (organism ? `&organism=${encodeURIComponent(organism)}` : '');
+	}
+
 	function launchViewerTab(fileName: string) {
 		const relativePath = currentSubdir ? `${currentSubdir}/${fileName}` : fileName;
 		window.open(`/jobs/${jobId}/view?path=${encodeURIComponent(relativePath)}`, '_blank');
@@ -836,6 +852,13 @@
 									</div>
 									<div class="flex items-center gap-3">
 										<span class="text-xs text-surface-400">{formatFileSize(entry.size)}</span>
+										{#if isGenomeViewer(entry.name)}
+											<a
+												href={genomeMapHref(entry.name)}
+												class="text-xs font-semibold text-tertiary-500 hover:text-tertiary-400"
+												title="Open the interactive genome / operon map"
+											>Open map</a>
+										{/if}
 										{#if isViewable(entry.name)}
 											<button
 												type="button"
