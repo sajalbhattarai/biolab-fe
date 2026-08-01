@@ -21,6 +21,11 @@
 	);
 	let isCommercial = $derived(usageType === 'commercial');
 	let canAccept = $derived(allChecked && !!usageType);
+	// How many acknowledgments are still unticked, so the disabled-button hint can
+	// say what is actually blocking rather than leaving the user to hunt for it.
+	let missingAckCount = $derived(
+		(terms?.acknowledgments ?? []).filter((a) => !checked[a.id]).length
+	);
 	let licensedIds = $derived(Object.keys(licensed).filter((id) => licensed[id]));
 	// Tools that will be turned off for this run, given the current answers:
 	// blocked tools without a license (always), plus commercial-restricted ones
@@ -197,9 +202,24 @@
 			>
 				{submitting ? 'Recording…' : 'Accept and continue'}
 			</button>
+			<!--
+				Must key off canAccept, not usageType alone. canAccept is
+				(allChecked && usageType), so picking a usage type but leaving an
+				acknowledgment unticked left the button disabled while this hint
+				showed the reassuring "Terms version..." line -- the button looked
+				broken rather than blocked. Name what is actually missing.
+			-->
 			<span class="text-xs text-surface-400">
-				{#if !usageType}
-					Select how you'll use MARGIE and check all acknowledgments to continue.
+				{#if !canAccept}
+					{#if !usageType && missingAckCount > 0}
+						Select how you'll use MARGIE, and check the
+						{missingAckCount} remaining acknowledgment{missingAckCount === 1 ? '' : 's'}.
+					{:else if !usageType}
+						Select how you'll use MARGIE to continue.
+					{:else}
+						Check the {missingAckCount} remaining
+						acknowledgment{missingAckCount === 1 ? '' : 's'} to continue.
+					{/if}
 				{:else}
 					Terms version {terms.terms_version}. Your acceptance, username, time (UTC) and IP are recorded.
 				{/if}
@@ -241,9 +261,25 @@
 			<dt class="text-surface-500 dark:text-surface-400">Research use</dt><dd>{t.research_use}</dd>
 			<dt class="text-surface-500 dark:text-surface-400">Commercial use</dt><dd>{t.commercial_use}</dd>
 			<dt class="text-surface-500 dark:text-surface-400">Permission</dt><dd>{t.user_action}</dd>
+			<!--
+				Only call it a licence link when it actually is one. license_url is
+				the verified licence page; obtain_url is usually just the provider's
+				homepage, and labelling that "License link" sent people to a front
+				page and implied they had read the terms.
+			-->
+			{#if t.license_url}
+				<dt class="text-surface-500 dark:text-surface-400">License terms</dt>
+				<dd><a href={t.license_url} target="_blank" rel="noopener noreferrer" class="text-primary-500 underline break-all">{t.license_url}</a></dd>
+			{/if}
 			{#if t.obtain_url}
-				<dt class="text-surface-500 dark:text-surface-400">License link</dt>
+				<dt class="text-surface-500 dark:text-surface-400">
+					{t.license_url ? 'Obtain from' : 'Provider page'}
+				</dt>
 				<dd><a href={t.obtain_url} target="_blank" rel="noopener noreferrer" class="text-primary-500 underline break-all">{t.obtain_url}</a></dd>
+			{/if}
+			{#if !t.license_url && t.license_quote}
+				<dt class="text-surface-500 dark:text-surface-400">License text</dt>
+				<dd class="opacity-80">quoted below — no direct licence URL on record</dd>
 			{/if}
 		</dl>
 		{#if t.license_quote}

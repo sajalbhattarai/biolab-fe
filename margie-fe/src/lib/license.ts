@@ -32,7 +32,16 @@ export interface CatalogTool {
 	research_use?: string;
 	user_action: string;
 	tier: string;
+	/** Where to obtain/download the tool. Usually the provider's landing page. */
 	obtain_url: string;
+	/**
+	 * Direct link to the actual licence text, when one is known. Distinct from
+	 * obtain_url, which is typically just the homepage -- labelling a homepage
+	 * "License link" was misleading. Optional: only populated where a specific
+	 * licence page has been verified, and the UI falls back to obtain_url with
+	 * honest wording when it is absent.
+	 */
+	license_url?: string;
 	allowed: string[];
 	not_allowed: string[];
 	citation?: string;
