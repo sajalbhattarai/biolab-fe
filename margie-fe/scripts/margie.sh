@@ -225,36 +225,42 @@ fi
 # we detect the collision and reconnect: ssh to the cluster address round-robins
 # across login nodes, so a fresh master connection usually lands elsewhere.
 # ---------------------------------------------------------------------------
-attempt=0
+# Candidate hosts, tried in order: the cluster alias first (so a single-login
+# cluster or a differently-named one still works), then explicit login nodes.
+#
+# Retrying the ALIAS does not move you. It was assumed to round-robin, but in
+# practice macOS DNS caching and/or ControlPersist pin it -- observed landing on
+# login03 six times in a row while login00 and login05 sat free. Explicit
+# hostnames are the only reliable way to reach a different node.
+_user="${HPC_HOST%%@*}"
+_dom="${HPC_HOST##*@}"
+CANDIDATES="$HPC_HOST"
+case "$_dom" in
+    login*) : ;;                                  # already a specific node
+    *) for nn in 00 01 02 03 04 05 06 07 08 09; do
+           CANDIDATES="$CANDIDATES ${_user}@login${nn}.${_dom}"
+       done ;;
+esac
+
 NODE=""
-while [ "$attempt" -lt 6 ]; do
-    attempt=$((attempt + 1))
+TARGET=""
+for cand in $CANDIDATES; do
     rm -f "$SOCKET"
-    # One authenticated master connection; everything below reuses it. If this
-    # fails, stop immediately instead of re-prompting for every later SSH call.
-    if ! ssh -M -S "$SOCKET" -o ConnectTimeout=15 -fN "$HPC_HOST"; then
-        echo
-        echo "  Could not connect to '$HPC_HOST'."
-        echo "  Check it is <your-hpc-username>@<your-hpc-address> and that you can SSH in,"
-        echo "  then fix the top of ~/bin/margie (or re-run setup) and try again."
-        exit 1
+    # -q silences the login banner, which otherwise prints on every probe.
+    if ! ssh -q -M -S "$SOCKET" -o ConnectTimeout=15 -o StrictHostKeyChecking=no \
+            -fN "$cand" 2>/dev/null; then
+        continue                                   # node down or not resolvable
     fi
 
-    NODE="$(ssh -S "$SOCKET" "$HPC_HOST" hostname 2>/dev/null)"
-
-    # Is 8000 free, ours already, or somebody else's?
+    _n="$(ssh -q -S "$SOCKET" "$cand" hostname 2>/dev/null)"
     # free  : nothing on 8000 -- we can bind
     # ours  : OUR OWN dane-api is already there
-    # taken : occupied by someone/something else -- move to another node
+    # taken : someone/something else has it -- try the next node
     #
-    # Ownership matters on a shared login node. An earlier version decided "ours"
-    # from openapi.json alone, but that is true of ANY user's MARGIE backend --
-    # so a second user landing here would reuse the first user's server, read the
-    # first user's account database, and lose their session the moment that user
-    # quit. Ownership is established two ways, both of which require the process
-    # to be ours: `ss -ltnp` only prints pid= for your own sockets, and pgrep -u
-    # only matches your own processes.
-    verdict="$(ssh -S "$SOCKET" "$HPC_HOST" '
+    # Ownership matters on a shared login node: `ss -ltnp` prints pid= only for
+    # sockets you own and `pgrep -u` only matches your own processes, so another
+    # user's MARGIE can never be mistaken for yours.
+    verdict="$(ssh -q -S "$SOCKET" "$cand" '
         if ! ss -ltn 2>/dev/null | grep -q ":8000 "; then
             echo free
         elif ss -ltnp 2>/dev/null | grep ":8000 " | grep -q "pid=" \
@@ -267,19 +273,22 @@ while [ "$attempt" -lt 6 ]; do
 
     case "$verdict" in
         free|ours)
+            NODE="${_n:-$cand}"
+            TARGET="$cand"
             row "node" "$NODE"
-            [ "$verdict" = ours ] && row "backend" "already running on this node"
+            [ "$verdict" = ours ] && row "backend" "already running (yours) — reusing"
             break
             ;;
         *)
-            row "node" "$NODE  — port 8000 in use by another service"
-            echo "    retrying on a different login node ($attempt/6)…"
-            ssh -S "$SOCKET" -O exit "$HPC_HOST" 2>/dev/null || true
-            NODE=""
-            sleep 1
+            row "${_n:-$cand}" "port 8000 taken by another process — next node"
+            ssh -q -S "$SOCKET" -O exit "$cand" 2>/dev/null || true
             ;;
     esac
 done
+
+# Everything downstream reuses the master socket, so point HPC_HOST at whichever
+# host we actually connected to.
+[ -n "$TARGET" ] && HPC_HOST="$TARGET"
 
 if [ -z "$NODE" ]; then
     echo
