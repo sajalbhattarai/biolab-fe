@@ -33,6 +33,7 @@
 	}
 	function clearHistory() {
 		messages = [];
+		subjectGene = '';
 		try { localStorage.removeItem(historyKey); } catch { /* ignore */ }
 	}
 
@@ -44,6 +45,11 @@
 	let busy = $state(false);
 	let messages = $state<Msg[]>([]);
 	let poll: ReturnType<typeof setInterval> | null = null;
+	// The gene the last answer was about. Echoed back so a follow-up like "tell
+	// me about the gene" or "what does its operon say?" stays on the same
+	// subject. Without it, the server has to guess from the transcript, which
+	// matched an arbitrary gene and answered confidently about the wrong one.
+	let subjectGene = $state('');
 
 	async function checkStatus(): Promise<boolean> {
 		try {
@@ -120,6 +126,10 @@
 					organism,
 					question: q,
 					stream: true,
+					// Keeps a follow-up on the same gene. The server falls back to
+					// searching the transcript without it, which resolved to an
+					// arbitrary gene and answered confidently about the wrong one.
+					subject_gene_id: subjectGene || null,
 					history: messages.slice(-7, -1).map((m) => ({ role: m.role, text: m.text }))
 				})
 			});
@@ -128,6 +138,15 @@
 				const body = await res.json().catch(() => ({}));
 				throw new Error(body.detail || `Chat failed (${res.status})`);
 			}
+
+			// Which gene this answer is about, for the next turn's follow-up.
+			try {
+				const cs = res.headers.get('X-Context-Summary');
+				if (cs) {
+					const parsed = JSON.parse(cs);
+					if (parsed?.subject_gene_id) subjectGene = parsed.subject_gene_id;
+				}
+			} catch { /* header is a convenience; never fail the answer over it */ }
 
 			// Append an empty turn and grow it as tokens arrive, so the answer is
 			// readable from the first word instead of after the whole generation.
