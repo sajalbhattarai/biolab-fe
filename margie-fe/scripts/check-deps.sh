@@ -22,8 +22,16 @@ case "${1:-}" in
     *) echo "usage: $(basename "$0") [--check|--yes]" >&2; exit 2 ;;
 esac
 
-NODE_MIN=18          # SvelteKit 2 / Vite 7 will not run below this
-NODE_LTS=22          # what we install when we have to install Node ourselves
+# What the app's own dependencies demand: @sveltejs/vite-plugin-svelte declares
+# engines ^20.19 || ^22.12 || >=24, and .npmrc sets engine-strict=true, so npm
+# does not warn about a wrong Node -- it refuses to install at all (EBADENGINE).
+#
+# This is NOT a simple "18 or newer". An 18, a 21 or a 23 all pass a floor check
+# and then fail the install, which is a worse outcome than being told up front:
+# setup reports everything is fine, and the first `margie` dies in npm with a
+# message about a package nobody here has heard of. Checked properly below.
+NODE_REQUIREMENT='20.19+ | 22.12+ | 24 or newer'
+NODE_LTS=24          # what we install when we have to install Node ourselves
 TMP="${TMPDIR:-/tmp}"
 
 # ---------------------------------------------------------------------------
@@ -117,6 +125,24 @@ node_major() {
     printf '%s' "$v"
 }
 
+node_minor() {
+    local v
+    v="$(node -v 2>/dev/null)" || return 1
+    v="${v#v}"; v="${v#*.}"; v="${v%%.*}"
+    case "$v" in ''|*[!0-9]*) printf '0' ;; *) printf '%s' "$v" ;; esac
+}
+
+# ^20.19 || ^22.12 || >=24, spelled out. The odd majors (21, 23) are not
+# oversights: they are non-LTS releases the toolchain deliberately excludes,
+# and a range check that let them through would be wrong in npm's favour.
+node_version_ok() {
+    local major="$1" minor="$2"
+    [ "$major" -ge 24 ] && return 0
+    [ "$major" -eq 22 ] && [ "$minor" -ge 12 ] && return 0
+    [ "$major" -eq 20 ] && [ "$minor" -ge 19 ] && return 0
+    return 1
+}
+
 # Bash 3.2 (still what macOS ships) trips over empty arrays under `set -u`,
 # so these stay plain space-separated strings.
 MISSING_REQ=""
@@ -151,10 +177,10 @@ echo
 # worse failure than no Node at all, because vite starts and then dies with a
 # syntax error nobody can read.
 if nm="$(node_major)"; then
-    if [ "$nm" -ge "$NODE_MIN" ]; then
+    if node_version_ok "$nm" "$(node_minor)"; then
         report "node" "found" "$(node -v)"
     else
-        report "node" "OLD" "$(node -v) — MARGIE needs $NODE_MIN or newer"
+        report "node" "WRONG" "$(node -v) — MARGIE needs $NODE_REQUIREMENT"
         MISSING_REQ="$MISSING_REQ node"
         NEED_NODE="yes"
     fi
@@ -295,11 +321,14 @@ install_pkgs() {
 # — 12.22 on Ubuntu 22.04, which cannot run this app. Use the distribution's
 # package when it is new enough, and NodeSource only when it is not.
 apt_node_major() {
-    local cand
+    local cand major minor
     cand="$(apt-cache policy nodejs 2>/dev/null | sed -n 's/^ *Candidate: *//p')"
     cand="${cand#*:}"                 # drop the epoch, e.g. 2:18.19.1~dfsg-6
-    cand="${cand%%.*}"
-    case "$cand" in ''|*[!0-9]*) echo 0 ;; *) echo "$cand" ;; esac
+    major="${cand%%.*}"
+    minor="${cand#*.}"; minor="${minor%%.*}"
+    case "$major" in ''|*[!0-9]*) major=0 ;; esac
+    case "$minor" in ''|*[!0-9]*) minor=0 ;; esac
+    echo "$major $minor"
 }
 
 install_node() {
@@ -308,10 +337,13 @@ install_node() {
             brew install node ;;
         apt)
             apt_refresh
-            if [ "$(apt_node_major)" -ge "$NODE_MIN" ]; then
+            # Ubuntu 24.04 offers 18.19 here, which engine-strict rejects, so
+            # the distribution package is only used when it genuinely satisfies
+            # the same rule the app is checked against.
+            if node_version_ok $(apt_node_major); then
                 sudo_run apt-get install -y nodejs npm
             else
-                echo "  This system's Node is too old — fetching Node $NODE_LTS from nodesource.com"
+                echo "  This system's Node does not meet $NODE_REQUIREMENT — fetching Node $NODE_LTS from nodesource.com"
                 curl -fsSL "https://deb.nodesource.com/setup_${NODE_LTS}.x" -o "$TMP/nodesource.sh" \
                     && sudo_run bash "$TMP/nodesource.sh" \
                     && sudo_run apt-get install -y nodejs
@@ -355,10 +387,10 @@ fi
 # ---------------------------------------------------------------------------
 section "Result"
 
-if nm="$(node_major)" && [ "$nm" -ge "$NODE_MIN" ]; then
+if nm="$(node_major)" && node_version_ok "$nm" "$(node_minor)"; then
     report "node" "ok" "$(node -v)"
 else
-    report "node" "STILL MISSING" "install the LTS from https://nodejs.org"
+    report "node" "STILL WRONG" "need $NODE_REQUIREMENT — get it from https://nodejs.org"
     FAILED="$FAILED node"
 fi
 
