@@ -5,6 +5,29 @@
 set -e
 
 # ---------------------------------------------------------------------------
+# Options
+#
+# --no-launch exists for the Windows installer (setup.ps1), which has its own
+# summary to print after this and cannot do that if setup execs into MARGIE.
+# ---------------------------------------------------------------------------
+LAUNCH="yes"
+DEPS="ask"
+for arg in "$@"; do
+    case "$arg" in
+        --check)     DEPS="check" ;;
+        --yes|-y)    DEPS="yes" ;;
+        --no-launch) LAUNCH="no" ;;
+        -h|--help)
+            echo "usage: ./setup.sh [--check] [--yes] [--no-launch]"
+            echo "  --check      only report what is installed and what is missing"
+            echo "  --yes        install anything missing without asking"
+            echo "  --no-launch  set everything up, but do not start MARGIE afterwards"
+            exit 0 ;;
+        *) echo "unknown option: $arg  (try --help)" >&2; exit 2 ;;
+    esac
+done
+
+# ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
 REPO="$(cd "$(dirname "$0")/margie-fe" && pwd)"
@@ -12,7 +35,26 @@ BIN="$HOME/bin"
 MARGIE="$BIN/margie"
 
 mkdir -p "$BIN"
-chmod +x "$REPO/scripts/margie.sh"
+chmod +x "$REPO/scripts/margie.sh" "$REPO/scripts/check-deps.sh"
+
+# ---------------------------------------------------------------------------
+# Does this computer have what MARGIE needs?
+#
+# Asked first, and asked out loud: a missing Node only shows up otherwise as a
+# vite crash several minutes later, long after the HPC questions below.
+# ---------------------------------------------------------------------------
+if [ "$DEPS" = "check" ]; then
+    exec "$REPO/scripts/check-deps.sh" --check
+fi
+
+DEP_ARGS=""
+[ "$DEPS" = "yes" ] && DEP_ARGS="--yes"
+
+if ! "$REPO/scripts/check-deps.sh" $DEP_ARGS; then
+    echo
+    echo "  Setup stops here — MARGIE cannot run until the pieces above are installed."
+    exit 1
+fi
 
 # ---------------------------------------------------------------------------
 # Your HPC settings.
@@ -104,27 +146,48 @@ echo "Installed $MARGIE"
 # ---------------------------------------------------------------------------
 # Make sure ~/bin is on PATH for your shell
 # ---------------------------------------------------------------------------
-case "${SHELL:-}" in
-    */zsh)
-        PROFILE="$HOME/.zshrc"
-        ;;
-    */bash)
-        PROFILE="$HOME/.bash_profile"
-        ;;
-    *)
-        PROFILE="$HOME/.profile"
-        ;;
-esac
-
 PATH_LINE='export PATH="$HOME/bin:$PATH"'
 
-if ! grep -qF "$PATH_LINE" "$PROFILE" 2>/dev/null; then
-    echo "$PATH_LINE" >> "$PROFILE"
+# Every startup file the shell ALREADY has gets the line, rather than one file
+# picked from $SHELL. Picking one was wrong on Ubuntu (so, on every Windows
+# machine running this under WSL): $SHELL is /bin/bash but ~/.bash_profile does
+# not exist there, and creating it makes login bash read that instead of
+# ~/.profile -- which is the file that pulls in ~/.bashrc. Setup would have
+# quietly cost the user their own shell setup to add one PATH entry.
+case "${SHELL:-}" in
+    */zsh)  CANDIDATES="$HOME/.zshrc $HOME/.zprofile" ;;
+    */bash) CANDIDATES="$HOME/.profile $HOME/.bashrc $HOME/.bash_profile" ;;
+    *)      CANDIDATES="$HOME/.profile" ;;
+esac
+
+add_path_line() {
+    grep -qF "$PATH_LINE" "$1" 2>/dev/null && return 0
+    printf '\n# added by MARGIE setup\n%s\n' "$PATH_LINE" >> "$1"
+}
+
+TOUCHED=""
+for f in $CANDIDATES; do
+    [ -e "$f" ] || continue
+    add_path_line "$f"
+    TOUCHED="$TOUCHED $f"
+done
+
+# Nothing existed to append to — create the first one, which is deliberately
+# the file a LOGIN shell reads, since that is how the Windows launcher starts.
+if [ -z "$TOUCHED" ]; then
+    set -- $CANDIDATES
+    add_path_line "$1"
 fi
 
 # ---------------------------------------------------------------------------
 # Launch (starts backend + tunnel + app, so you can register)
 # ---------------------------------------------------------------------------
+if [ "$LAUNCH" = "no" ]; then
+    echo
+    echo "Setup is done. Start MARGIE any time with:  margie"
+    exit 0
+fi
+
 echo
 echo "Starting MARGIE so you can register — this is exactly what 'margie' does every time."
 echo "In future, just open a new terminal and run:  margie"

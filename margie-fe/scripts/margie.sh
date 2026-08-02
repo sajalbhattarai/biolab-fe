@@ -7,6 +7,29 @@
 set -u
 
 # ---------------------------------------------------------------------------
+# Where are we, and is everything on PATH?
+#
+# On Windows this runs inside WSL, started by the margie.cmd launcher rather
+# than by a person at a prompt. That environment is thinner than a terminal's:
+#
+#   * $USER can be unset, and `set -u` would abort on the log and socket names
+#     below before printing anything at all.
+#   * a Node installed by nvm lives in .bashrc, which a non-interactive login
+#     shell never reads, so `node` would appear to be missing.
+# ---------------------------------------------------------------------------
+USER="${USER:-$(id -un 2>/dev/null || echo user)}"
+
+is_wsl() {
+    [ -n "${WSL_DISTRO_NAME:-}" ] || grep -qi microsoft /proc/version 2>/dev/null
+}
+
+if ! command -v node >/dev/null 2>&1 && [ -s "$HOME/.nvm/nvm.sh" ]; then
+    export NVM_DIR="$HOME/.nvm"
+    # shellcheck disable=SC1091
+    . "$NVM_DIR/nvm.sh" >/dev/null 2>&1 || true
+fi
+
+# ---------------------------------------------------------------------------
 # Settings (baked into ~/bin/margie by setup.sh)
 # ---------------------------------------------------------------------------
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -60,6 +83,45 @@ row() {
 }
 
 # ---------------------------------------------------------------------------
+# Kill whatever is holding a local port.
+#
+# lsof is the macOS answer but is NOT installed on a stock Ubuntu — including
+# the one WSL gives Windows users — so a missing lsof silently stopped stale
+# ports being freed there. Fall through to tools that distribution does ship.
+# ---------------------------------------------------------------------------
+free_port() {
+    port="$1"
+    if command -v lsof >/dev/null 2>&1; then
+        lsof -ti "tcp:$port" 2>/dev/null | xargs kill 2>/dev/null
+    elif command -v fuser >/dev/null 2>&1; then
+        fuser -k "$port/tcp" >/dev/null 2>&1
+    elif command -v ss >/dev/null 2>&1; then
+        ss -ltnp 2>/dev/null | sed -n "s/.*:$port .*pid=\([0-9]*\).*/\1/p" \
+            | xargs -r kill 2>/dev/null
+    fi
+    return 0
+}
+
+# ---------------------------------------------------------------------------
+# Open the app in the user's browser.
+#
+# Under WSL the browser is on the Windows side, and xdg-open — which often
+# exists — either does nothing or opens a Linux browser that isn't installed.
+# Ask Windows directly instead. explorer.exe reports failure even when it
+# worked, so its exit code is deliberately ignored.
+# ---------------------------------------------------------------------------
+open_url() {
+    url="$1"
+    if is_wsl; then
+        command -v wslview     >/dev/null 2>&1 && wslview "$url"     >/dev/null 2>&1 && return 0
+        command -v explorer.exe >/dev/null 2>&1 && { explorer.exe "$url" >/dev/null 2>&1; return 0; }
+    fi
+    command -v open     >/dev/null 2>&1 && open "$url"     >/dev/null 2>&1 && return 0
+    command -v xdg-open >/dev/null 2>&1 && xdg-open "$url" >/dev/null 2>&1 && return 0
+    return 0
+}
+
+# ---------------------------------------------------------------------------
 # Shut everything down cleanly on exit
 # ---------------------------------------------------------------------------
 # Shut the session down on exit: front-end, tunnel, and every dane-api of ours
@@ -91,6 +153,20 @@ trap cleanup INT TERM EXIT
 section "MARGIE"
 row "HPC host"  "$HPC_HOST"
 row "Front-end" "$REPO"
+if is_wsl; then
+    row "running in" "WSL — ${WSL_DISTRO_NAME:-Linux}"
+    # /mnt/* is the Windows disk seen from Linux. It works, but npm crawls over
+    # the filesystem bridge and vite's file watcher gets no events at all, so
+    # the page never reloads -- which reads as "MARGIE is broken".
+    case "$REPO" in
+        /mnt/*)
+            echo
+            echo "  NOTE: MARGIE is on the Windows disk, which makes it slow and stops"
+            echo "        the page reloading when you edit. To move it into Linux:"
+            echo "          cp -r \"$REPO\" ~/biolab-fe && cd ~/biolab-fe && ./setup.sh"
+            ;;
+    esac
+fi
 
 # ---------------------------------------------------------------------------
 # What kind of launch?
@@ -121,7 +197,7 @@ esac
 # Free local ports left over from a previous run
 # ---------------------------------------------------------------------------
 for port in 5173 8000; do
-    lsof -ti "tcp:$port" 2>/dev/null | xargs kill 2>/dev/null
+    free_port "$port"
 done
 
 # ---------------------------------------------------------------------------
@@ -411,7 +487,27 @@ row "API" "$API_URL"
 # ---------------------------------------------------------------------------
 section "Front-end"
 cd "$REPO"
-npm install >/dev/null 2>&1
+
+if ! command -v npm >/dev/null 2>&1; then
+    echo "  Node.js is not on PATH, so the app cannot start."
+    echo "  Run this once to sort it out:  $REPO/scripts/check-deps.sh"
+    exit 1
+fi
+
+# This used to be silenced entirely. When it failed -- a half-written
+# node_modules, no network, a disk full -- vite then died for a reason that had
+# nothing to do with npm, and the log said so. Show the real cause instead.
+NPM_LOG="${TMPDIR:-/tmp}/margie-npm-$USER.log"
+printf '  installing dependencies'
+if npm install > "$NPM_LOG" 2>&1; then
+    printf ' ok\n'
+else
+    printf '\n'
+    echo "  npm install failed. Last lines of $NPM_LOG:"
+    tail -n 20 "$NPM_LOG" 2>/dev/null | sed 's/^/    /'
+    exit 1
+fi
+
 npm run dev > "$VITE_LOG" 2>&1 &
 FE_PID=$!
 printf '  starting vite'
@@ -447,6 +543,7 @@ section "MARGIE READY"
 row "Front-end"   "$FRONTEND_URL"
 row "Backend API" "$API_URL"
 row "HPC node"    "$NODE"
+is_wsl && row "in Windows" "if no browser opens, paste $FRONTEND_URL into it"
 echo
-open "$FRONTEND_URL" 2>/dev/null || xdg-open "$FRONTEND_URL" 2>/dev/null || true
+open_url "$FRONTEND_URL"
 wait "$FE_PID"
