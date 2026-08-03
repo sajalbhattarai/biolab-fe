@@ -15,12 +15,25 @@ Runs on **macOS** | **Windows** | **Linux**.
 <a href="#what-you-need"><b>What you need</b></a> &nbsp;|&nbsp;
 <a href="#quick-start"><b>Quick start</b></a> &nbsp;|&nbsp;
 <a href="#windows"><b>Windows</b></a> &nbsp;|&nbsp;
+<a href="#acknowledgements"><b>Acknowledgements</b></a> &nbsp;|&nbsp;
 <a href="#more-details"><b>More details</b></a>
 
 </div>
 
-> [!TIP]
-> **Just want to use it?** You don't have to install anything. The app is already online at **[bsp.anvilcloud.rcac.purdue.edu](https://bsp.anvilcloud.rcac.purdue.edu/)**. The steps below are only if you'd like to run your own copy.
+<details>
+<summary><b>Tip: Just want to use it?</b></summary>
+
+You don't have to install anything. The app is already online at **[bsp.anvilcloud.rcac.purdue.edu](https://bsp.anvilcloud.rcac.purdue.edu/)**. The steps below are only if you'd like to run your own copy.
+
+</details>
+
+## Repo scope
+
+This repository is the **frontend** repository for MARGIE.
+It contains GUI code and launcher/setup flow for browser-based usage.
+It does **not** contain backend pipeline implementation details.
+
+For backend pipeline, CLI, API, and backend runtime/config details, use **[bioinformatics-tools](https://github.com/sajalbhattarai/bioinformatics-tools)**.
 
 ## What you need
 
@@ -252,6 +265,16 @@ cp -r /mnt/c/path/to/biolab-fe ~/biolab-fe && cd ~/biolab-fe && ./setup.sh
 </details>
 
 <a id="more-details"></a>
+
+## Acknowledgements
+
+Phase 9-12 scripts were designed and implemented by **Sajal Bhattarai**.
+During script development, **Claude Sonnet 4.6** was used in interactive mode to improve robustness and debug issues.
+The core ideas, architecture, and intended behavior were defined by Sajal Bhattarai.
+These scripts were manually validated for intended behavior.
+
+Visualization and LLM work, including the operon circular diagram page, HTML creation, and interactive chat mode, were refined with interactive-mode assistance from **Claude Opus 4.8**.
+These components were also manually checked and validated for intended purpose.
 
 <details>
 <summary><b>More details on how it works</b></summary>
