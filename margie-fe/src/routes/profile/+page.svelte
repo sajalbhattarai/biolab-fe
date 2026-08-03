@@ -648,28 +648,38 @@
 		</section>
 	{:else if connected && Object.keys(config).length > 0}
 		<section class="card p-6 bg-surface-100 dark:bg-surface-800">
-			<h2 class="text-2xl font-bold text-primary-500">CONFIG</h2>
-			<p class="text-sm text-surface-500 dark:text-surface-400 mb-4">
-				This section stores the global database and SLURM settings used by the backend.
-				Workflow-specific roots and tool defaults live below in Workflow Specific Settings.
-			</p>
-
-			<!-- Important Note -->
-			<div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
-				<div class="flex items-start gap-3">
-					<span class="text-blue-600 dark:text-blue-400 text-xl font-bold">ℹ️</span>
-					<div>
-						<p class="text-sm text-blue-900 dark:text-blue-100 font-semibold mb-1">Database Configuration</p>
-						<p class="text-xs text-blue-800 dark:text-blue-200">
-							Set the main_database key to the writable database path you want the backend to use.
-							If you leave it unset, the app falls back to ~/.local/share/bioinformatics-tools/my-db.db.
-						</p>
+			<details class="group" open>
+				<summary class="cursor-pointer list-none rounded-xl border border-primary-200/70 dark:border-primary-900/40 bg-gradient-to-br from-primary-50 to-surface-50 dark:from-primary-950/30 dark:to-surface-900/70 p-4 shadow-sm">
+					<div class="flex items-center justify-between gap-4">
+						<h2 class="text-2xl font-bold text-primary-700 dark:text-primary-300">GLOBAL CONFIG</h2>
+						<div class="text-xs font-semibold uppercase tracking-wide text-surface-600 dark:text-surface-300">
+							<span class="group-open:hidden">Expand</span>
+							<span class="hidden group-open:inline">Collapse</span>
+						</div>
 					</div>
-				</div>
-			</div>
+				</summary>
+				<div class="mt-4">
+					<p class="text-sm text-surface-500 dark:text-surface-400 mb-4">
+						This section stores the global database and SLURM settings used by the backend.
+						Workflow-specific roots and tool defaults live below in Workflow Specific Settings.
+					</p>
 
-			<h3 class="text-xl font-semibold mb-4 text-secondary-500">SLURM Configuration</h3>
-			<div class="grid gap-3 md:grid-cols-2">
+					<!-- Important Note -->
+					<div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+						<div class="flex items-start gap-3">
+							<span class="text-blue-600 dark:text-blue-400 text-xl font-bold">ℹ️</span>
+							<div>
+								<p class="text-sm text-blue-900 dark:text-blue-100 font-semibold mb-1">Database Configuration</p>
+								<p class="text-xs text-blue-800 dark:text-blue-200">
+									Set the main_database key to the writable database path you want the backend to use.
+									If you leave it unset, the app falls back to ~/.local/share/bioinformatics-tools/my-db.db.
+								</p>
+							</div>
+						</div>
+					</div>
+
+					<h3 class="text-xl font-semibold mb-4 text-secondary-500">SLURM Configuration</h3>
+					<div class="grid gap-3 md:grid-cols-2">
 				{#each slurmParams as param}
 					{@const parts = param.param.split('.')}
 					{@const value = getNestedValue(formValues, parts)}
@@ -719,24 +729,24 @@
 
 							{#if pathTestResult}
 								{#if pathTestResult.writable}
-									<div class="flex items-center gap-2 text-green-700 dark:text-green-400">
-										<span class="inline-block w-2 h-2 rounded-full bg-green-500"></span>
-										<span class="text-sm font-semibold">Path is writable ✓</span>
-									</div>
-								{:else}
-									<div class="flex items-center gap-2 text-red-700 dark:text-red-400">
-										<span class="inline-block w-2 h-2 rounded-full bg-red-500"></span>
-										<span class="text-sm font-semibold">Path is not writable ✗</span>
-									</div>
-								{/if}
-							{/if}
-						</div>
-
-						{#if pathTestResult && !pathTestResult.writable && pathTestResult.error}
-							<div class="text-xs text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30 rounded p-2 font-mono">
-								{pathTestResult.error}
+							<div class="flex justify-center mt-8">
+								<button
+									type="button"
+									onclick={saveConfig}
+									disabled={saving}
+									class="btn variant-filled-primary btn-lg px-8 py-2"
+								>
+									{saving ? 'Saving...' : 'Save Configuration'}
+								</button>
 							</div>
-						{/if}
+							{/if}
+							<!-- Configuration Guide -->
+							<div class="mt-6 pt-6 border-t border-surface-300 dark:border-surface-600">
+								<details class="text-left">
+									<summary class="cursor-pointer text-sm text-primary-500 hover:text-primary-700 font-semibold mb-3">
+										📖 Configuration Guide
+									</summary>
+									<div class="mt-3 space-y-3 text-sm text-surface-700 dark:text-surface-300">
 					</div>
 				</div>
 			</div>
@@ -785,14 +795,17 @@
 								Unspecified values use sensible defaults defined in each workflow rule.
 							</p>
 						</div>
+							</div>
+						</details>
 					</div>
-				</details>
+				</div>
 			</div>
+			</details>
 		</section>
 
 		{#if workflowPathSettings.length > 0}
 			<section class="card p-6 bg-white dark:bg-surface-900 mt-8 border border-surface-300/70 dark:border-surface-700 shadow-sm">
-				<h2 class="text-2xl font-bold text-primary-700 dark:text-primary-300">Workflow Specific Settings</h2>
+				<h2 class="text-2xl font-bold text-primary-700 dark:text-primary-300">WORKFLOW SPECIFIC CONFIG</h2>
 				<p class="text-sm text-surface-700 dark:text-surface-300 mb-4">
 					Edit per-workflow roots and defaults in one place.
 					This section stays collapsed until you need it, but it is the source of truth for Analyze defaults.
@@ -1020,21 +1033,31 @@ compute:
 
 	<!-- Cluster Credentials Section -->
 	<section class="card p-6 bg-surface-100 dark:bg-surface-800">
-		<h2 class="text-2xl font-bold text-primary-500">Cluster Credentials</h2>
-		<p class="text-sm text-surface-500 dark:text-surface-400 mb-4">
-			Update your HPC cluster connection details here.
-			The backend validates changes before saving them, so you can confirm the new host, username, and key are working.
-		</p>
+		<details class="group">
+			<summary class="cursor-pointer list-none rounded-xl border border-secondary-200/70 dark:border-secondary-900/40 bg-gradient-to-br from-secondary-50 to-surface-50 dark:from-secondary-950/30 dark:to-surface-900/70 p-4 shadow-sm">
+				<div class="flex items-center justify-between gap-4">
+					<h2 class="text-2xl font-bold text-secondary-700 dark:text-secondary-300">Cluster Credentials</h2>
+					<div class="text-xs font-semibold uppercase tracking-wide text-surface-600 dark:text-surface-300">
+						<span class="group-open:hidden">Expand</span>
+						<span class="hidden group-open:inline">Collapse</span>
+					</div>
+				</div>
+			</summary>
+			<div class="mt-4">
+				<p class="text-sm text-surface-500 dark:text-surface-400 mb-4">
+					Update your HPC cluster connection details here.
+					The backend validates changes before saving them, so you can confirm the new host, username, and key are working.
+				</p>
 
-		{#if credentialsError}
-			<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">{credentialsError}</div>
-		{/if}
+				{#if credentialsError}
+					<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">{credentialsError}</div>
+				{/if}
 
-		{#if credentialsSuccess}
-			<div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">{credentialsSuccess}</div>
-		{/if}
+				{#if credentialsSuccess}
+					<div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">{credentialsSuccess}</div>
+				{/if}
 
-		<div class="space-y-4">
+				<div class="space-y-4">
 			<!-- Cluster Host -->
 			<div>
 				<label for="cluster-host" class="block text-sm font-semibold mb-2">Cluster Host</label>
@@ -1098,6 +1121,8 @@ compute:
 					{savingCredentials ? 'Updating...' : 'Update Credentials'}
 				</button>
 			</div>
+				</div>
 		</div>
+		</details>
 	</section>
 </div>
