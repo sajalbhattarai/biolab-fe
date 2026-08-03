@@ -170,7 +170,7 @@ It asks for three things about your cluster:
 | --- | --- |
 | **HPC username** — may differ from your computer's username | `jdoe` |
 | **HPC address** | `cluster.university.edu` |
-| **Path to the `bioinformatics-tools` folder on the HPC** — the folder that contains `pyproject.toml` | `/home/jdoe/bioinformatics-tools` |
+| **Path to the backend [bioinformatics-tools](https://github.com/sajalbhattarai/bioinformatics-tools) folder on the HPC** — the backend repo folder that contains `pyproject.toml` | `/home/jdoe/bioinformatics-tools` |
 
 > **Prefer not to be asked?** Open `setup.sh` and fill in `HPC_USER`, `HPC_ADDR`, and `BACKEND_DIR` at the top before running — setup then skips the questions. You can change any of these later in `~/bin/margie`.
 
