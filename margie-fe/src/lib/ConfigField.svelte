@@ -44,15 +44,15 @@
 
 <div class="config-field {compact ? 'config-field-compact mb-2' : 'mb-4'}">
 	<div class="flex-1 {compact ? 'mb-1' : 'mb-2'}">
-		<span class="font-medium">
+		<span class="font-semibold text-surface-800 dark:text-surface-100">
 			{displayName}
 			{#if required}
 				<span class="text-error-500">*</span>
 			{/if}
 		</span>
-		<p class="text-xs text-surface-600 dark:text-surface-400 mt-1">{description}</p>
+		<p class="text-xs text-surface-700 dark:text-surface-300 mt-1 leading-snug">{description}</p>
 		{#if !isDefault && defaultValue !== null}
-			<p class="text-xs text-primary-600 dark:text-primary-400 mt-1">
+			<p class="text-xs text-primary-700 dark:text-primary-300 mt-1 font-medium">
 				Default: {defaultValue}
 			</p>
 		{/if}
@@ -62,7 +62,7 @@
 		{#if type === 'int' || type === 'number'}
 			<input
 				type="number"
-				class="input"
+				class="input w-full bg-white dark:bg-surface-900 border border-surface-300 dark:border-surface-600"
 				placeholder={defaultValue !== null ? String(defaultValue) : ''}
 				value={displayValue}
 				oninput={handleInput}
@@ -72,7 +72,7 @@
 		{:else}
 			<input
 				type="text"
-				class="input"
+				class="input w-full bg-white dark:bg-surface-900 border border-surface-300 dark:border-surface-600"
 				placeholder={defaultValue !== null ? String(defaultValue) : ''}
 				value={displayValue}
 				oninput={handleInput}
@@ -85,11 +85,30 @@
 
 <style>
 	.config-field {
-		border-left: 3px solid rgb(var(--color-primary-500) / 0.3);
-		padding-left: 0.75rem;
+		border: 1px solid rgb(var(--color-surface-300) / 0.85);
+		border-radius: 0.75rem;
+		padding: 0.875rem 1rem;
+		background: rgb(var(--color-surface-50) / 0.85);
+		gap: 0.75rem;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(16rem, 24rem);
+		align-items: start;
 	}
 
 	.config-field-compact {
-		padding-left: 0.5rem;
+		padding: 0.75rem 0.875rem;
+		grid-template-columns: minmax(0, 1fr) minmax(12rem, 18rem);
+	}
+
+	:global(.dark) .config-field {
+		border-color: rgb(var(--color-surface-700) / 0.9);
+		background: rgb(var(--color-surface-900) / 0.65);
+	}
+
+	@media (max-width: 768px) {
+		.config-field,
+		.config-field-compact {
+			grid-template-columns: 1fr;
+		}
 	}
 </style>

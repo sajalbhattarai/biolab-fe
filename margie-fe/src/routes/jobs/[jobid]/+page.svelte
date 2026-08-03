@@ -461,7 +461,10 @@
 				headers: authHeaders()
 			});
 			if (res.status === 401) { handle401(); return; }
-			if (!res.ok) throw new Error('Failed to cancel job');
+			if (!res.ok) {
+				const body = await res.json().catch(() => null);
+				throw new Error(body?.detail || `Failed to cancel job (${res.status})`);
+			}
 			const data = await res.json();
 			console.log('Job cancelled:', data);
 			// Immediately refresh status

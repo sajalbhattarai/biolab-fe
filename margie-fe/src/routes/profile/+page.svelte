@@ -580,7 +580,7 @@
 	{/if}
 
 	<!-- SSH Connection Status -->
-	<section class="card p-6 bg-surface-100 dark:bg-surface-800 w-full max-w-2xl">
+	<section class="card p-6 bg-surface-100 dark:bg-surface-800 border border-surface-300/70 dark:border-surface-700 shadow-sm w-full max-w-2xl">
 		<div class="mb-2 flex items-center gap-2">
 			<h2 class="text-2xl font-bold text-primary-500">SSH Connection</h2>
 		</div>
@@ -643,16 +643,16 @@
 
 	<!-- Config Section -->
 	{#if loading}
-		<section class="card p-6 bg-surface-100 dark:bg-surface-800 text-center">
+		<section class="card p-6 bg-surface-100 dark:bg-surface-800 border border-surface-300/70 dark:border-surface-700 shadow-sm text-center">
 			<p class="text-surface-500">Loading configuration...</p>
 		</section>
 	{:else if connected && Object.keys(config).length > 0}
-		<section class="card p-6 bg-surface-100 dark:bg-surface-800">
+		<section class="card p-6 bg-surface-100 dark:bg-surface-800 border border-surface-300/70 dark:border-surface-700 shadow-sm">
 			<details class="group" open>
-				<summary class="cursor-pointer list-none rounded-xl border border-primary-200/70 dark:border-primary-900/40 bg-gradient-to-br from-primary-50 to-surface-50 dark:from-primary-950/30 dark:to-surface-900/70 p-4 shadow-sm">
+				<summary class="cursor-pointer list-none rounded-xl border border-surface-300/80 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 p-4 shadow-sm">
 					<div class="flex items-center justify-between gap-4">
 						<h2 class="text-2xl font-bold text-primary-700 dark:text-primary-300">GLOBAL CONFIG</h2>
-						<div class="text-xs font-semibold uppercase tracking-wide text-surface-600 dark:text-surface-300">
+						<div class="text-xs font-semibold uppercase tracking-wide text-surface-600 dark:text-surface-400">
 							<span class="group-open:hidden">Expand</span>
 							<span class="hidden group-open:inline">Collapse</span>
 						</div>
@@ -665,12 +665,12 @@
 					</p>
 
 					<!-- Important Note -->
-					<div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+					<div class="bg-surface-100 dark:bg-surface-800 border border-surface-300/70 dark:border-surface-700 rounded-lg p-4 mb-6 shadow-sm">
 						<div class="flex items-start gap-3">
-							<span class="text-blue-600 dark:text-blue-400 text-xl font-bold">ℹ️</span>
+							<span class="text-primary-500 text-xl font-bold">ℹ️</span>
 							<div>
-								<p class="text-sm text-blue-900 dark:text-blue-100 font-semibold mb-1">Database Configuration</p>
-								<p class="text-xs text-blue-800 dark:text-blue-200">
+								<p class="text-sm text-surface-900 dark:text-surface-100 font-semibold mb-1">Database Configuration</p>
+								<p class="text-xs text-surface-600 dark:text-surface-400">
 									Set the main_database key to the writable database path you want the backend to use.
 									If you leave it unset, the app falls back to ~/.local/share/bioinformatics-tools/my-db.db.
 								</p>
@@ -729,24 +729,12 @@
 
 							{#if pathTestResult}
 								{#if pathTestResult.writable}
-							<div class="flex justify-center mt-8">
-								<button
-									type="button"
-									onclick={saveConfig}
-									disabled={saving}
-									class="btn variant-filled-primary btn-lg px-8 py-2"
-								>
-									{saving ? 'Saving...' : 'Save Configuration'}
-								</button>
-							</div>
+									<div class="text-sm text-green-700 dark:text-green-300 font-semibold">Path is writable</div>
+								{:else}
+									<div class="text-sm text-red-700 dark:text-red-300 font-semibold">Path is not writable</div>
 							{/if}
-							<!-- Configuration Guide -->
-							<div class="mt-6 pt-6 border-t border-surface-300 dark:border-surface-600">
-								<details class="text-left">
-									<summary class="cursor-pointer text-sm text-primary-500 hover:text-primary-700 font-semibold mb-3">
-										📖 Configuration Guide
-									</summary>
-									<div class="mt-3 space-y-3 text-sm text-surface-700 dark:text-surface-300">
+							{/if}
+						</div>
 					</div>
 				</div>
 			</div>
@@ -799,41 +787,40 @@
 						</details>
 					</div>
 				</div>
-			</div>
 			</details>
 		</section>
 
 		{#if workflowPathSettings.length > 0}
-			<section class="card p-6 bg-white dark:bg-surface-900 mt-8 border border-surface-300/70 dark:border-surface-700 shadow-sm">
+			<section class="card p-6 bg-surface-100 dark:bg-surface-800 mt-8 border border-surface-300/70 dark:border-surface-700 shadow-sm">
 				<h2 class="text-2xl font-bold text-primary-700 dark:text-primary-300">WORKFLOW SPECIFIC CONFIG</h2>
 				<p class="text-sm text-surface-700 dark:text-surface-300 mb-4">
 					Edit per-workflow roots and defaults in one place.
 					This section stays collapsed until you need it, but it is the source of truth for Analyze defaults.
 				</p>
 				<details class="group">
-					<summary class="cursor-pointer list-none rounded-2xl border border-primary-300/80 dark:border-primary-700/50 bg-gradient-to-br from-primary-100 to-surface-100 dark:from-primary-900/35 dark:to-surface-800 p-5 shadow-md">
+					<summary class="cursor-pointer list-none rounded-2xl border border-surface-300/80 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 p-5 shadow-sm">
 						<div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-end">
-							<div class="text-xs font-semibold uppercase tracking-wide text-surface-700 dark:text-surface-300 group-open:hidden">Expand</div>
-							<div class="text-xs font-semibold uppercase tracking-wide text-surface-700 dark:text-surface-300 hidden group-open:block">Collapse</div>
+							<div class="text-xs font-semibold uppercase tracking-wide text-surface-600 dark:text-surface-400 group-open:hidden">Expand</div>
+							<div class="text-xs font-semibold uppercase tracking-wide text-surface-600 dark:text-surface-400 hidden group-open:block">Collapse</div>
 						</div>
 					</summary>
 
-					<div class="mt-4 rounded-xl border border-surface-300 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/90 p-4 space-y-4">
+					<div class="mt-4 rounded-xl border border-surface-300/70 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 p-4 space-y-4">
 						<div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
 							<div>
-								<h3 class="text-lg font-semibold text-primary-700 dark:text-primary-300">
+								<h3 class="text-lg font-semibold text-surface-900 dark:text-surface-100">
 									{selectedWorkflowPathSettings?.label}
 								</h3>
-								<p class="mt-1 text-xs text-surface-700 dark:text-surface-300">SIF/database roots and default input/output paths for this workflow.</p>
+								<p class="mt-1 text-xs text-surface-600 dark:text-surface-400">SIF/database roots and default input/output paths for this workflow.</p>
 							</div>
 							<div class="min-w-[16rem]">
-								<label class="block text-xs font-semibold uppercase tracking-wide text-surface-700 dark:text-surface-300 mb-2" for="workflow-path-picker">
+								<label class="block text-xs font-semibold uppercase tracking-wide text-surface-600 dark:text-surface-400 mb-2" for="workflow-path-picker">
 									Workflow
 								</label>
 								<select
 									id="workflow-path-picker"
 									bind:value={selectedWorkflowPathId}
-									class="input w-full rounded-lg bg-white dark:bg-surface-700 border border-surface-400 dark:border-surface-500 px-4 py-2 text-surface-900 dark:text-surface-100"
+									class="input w-full rounded-lg bg-surface-100 dark:bg-surface-800 border border-surface-300 dark:border-surface-600 px-4 py-2 text-surface-900 dark:text-surface-100"
 								>
 									{#each workflowPathSettings as wfSettings}
 										<option value={wfSettings.id}>{wfSettings.label}</option>
@@ -844,45 +831,45 @@
 
 						{#if selectedWorkflowPathSettings}
 							<div class="space-y-5">
-								<div class="rounded-xl border border-primary-300/60 dark:border-primary-700/50 bg-primary-50/55 dark:bg-primary-950/20 p-4">
-									<h4 class="text-sm font-semibold uppercase tracking-wide text-primary-600 dark:text-primary-300">Required for Run</h4>
-									<p class="mt-1 text-xs text-surface-700 dark:text-surface-300">Set these first. These are the core workflow roots plus required shared stores needed for normal execution.</p>
+								<div class="rounded-xl border border-surface-300/70 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 p-4">
+									<h4 class="text-sm font-semibold uppercase tracking-wide text-surface-900 dark:text-surface-100">Required for Run</h4>
+									<p class="mt-1 text-xs text-surface-600 dark:text-surface-400">Set these first. These are the core workflow roots plus required shared stores needed for normal execution.</p>
 									<div class="mt-4 grid gap-3 xl:grid-cols-2">
 										{#each selectedWorkflowRequiredPathParams as param}
 											{@const parts = param.param.split('.')}
 											{@const value = getNestedValue(formValues, parts)}
-											<div class="rounded-lg border border-primary-300/45 dark:border-primary-700/45 bg-white dark:bg-surface-800 p-3 space-y-2 shadow-sm">
+											<div class="rounded-lg border border-surface-300/70 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 p-3 space-y-2 shadow-sm">
 												<div class="flex items-start justify-between gap-2">
-													<h5 class="text-sm font-semibold text-surface-800 dark:text-surface-100">{prettyPathLabel(param.param)}</h5>
-													<span class="text-[10px] uppercase tracking-wide rounded-full bg-primary-600/20 text-primary-800 dark:text-primary-200 px-2 py-0.5 border border-primary-400/40 dark:border-primary-600/40">Required</span>
+													<h5 class="text-sm font-semibold text-surface-900 dark:text-surface-100">{prettyPathLabel(param.param)}</h5>
+													<span class="text-[10px] uppercase tracking-wide rounded-full bg-surface-200 text-surface-700 dark:bg-surface-800 dark:text-surface-300 px-2 py-0.5 border border-surface-300 dark:border-surface-600">Required</span>
 												</div>
-												<p class="text-xs text-surface-700 dark:text-surface-300 leading-snug">{param.description}</p>
-												<p class="text-[11px] text-surface-700 dark:text-surface-300">Key: <span class="font-mono text-surface-900 dark:text-surface-100 break-all">{param.param}</span></p>
+												<p class="text-xs text-surface-600 dark:text-surface-400 leading-snug">{param.description}</p>
+												<p class="text-[11px] text-surface-600 dark:text-surface-400">Key: <span class="font-mono text-surface-900 dark:text-surface-100 break-all">{param.param}</span></p>
 												<input
 													type="text"
-													class="input w-full h-11 px-3 font-mono text-[13px] rounded-lg bg-white dark:bg-surface-700 border border-surface-400 dark:border-surface-500 text-surface-900 dark:text-surface-100"
+													class="input w-full h-11 px-3 font-mono text-[13px] rounded-lg bg-surface-100 dark:bg-surface-800 border border-surface-300 dark:border-surface-600 text-surface-900 dark:text-surface-100"
 													placeholder={param.default !== null && param.default !== undefined ? String(param.default) : ''}
 													value={value ?? ''}
 													oninput={(event) => handleWorkflowPathInput(param.param, event)}
 												/>
-												<p class="text-[11px] text-surface-700 dark:text-surface-300">Default: <span class="font-mono break-all">{String(param.default ?? '')}</span></p>
+												<p class="text-[11px] text-surface-600 dark:text-surface-400">Default: <span class="font-mono break-all">{String(param.default ?? '')}</span></p>
 											</div>
 										{/each}
 									</div>
 								</div>
 
 								{#if selectedWorkflowRecordKeepingPathParams.length > 0}
-									<details class="rounded-xl border border-emerald-300/55 dark:border-emerald-700/45 bg-emerald-50/50 dark:bg-emerald-950/15 p-4">
-										<summary class="cursor-pointer text-sm font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">Optional Record-Keeping Paths</summary>
-										<p class="mt-2 text-xs text-surface-700 dark:text-surface-300">Archives and historical exports. Helpful for tracking and reproducibility, but not required for core execution.</p>
+									<details class="rounded-xl border border-surface-300/70 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 p-4">
+										<summary class="cursor-pointer text-sm font-semibold uppercase tracking-wide text-surface-900 dark:text-surface-100">Optional Record-Keeping Paths</summary>
+										<p class="mt-2 text-xs text-surface-600 dark:text-surface-400">Archives and historical exports. Helpful for tracking and reproducibility, but not required for core execution.</p>
 										<div class="mt-4 grid gap-3 xl:grid-cols-2">
 											{#each selectedWorkflowRecordKeepingPathParams as param}
 												{@const parts = param.param.split('.')}
 												{@const value = getNestedValue(formValues, parts)}
-												<div class="rounded-lg border border-emerald-300/45 dark:border-emerald-700/35 bg-white dark:bg-surface-800 p-3 space-y-2 shadow-sm">
-													<h5 class="text-sm font-semibold text-surface-800 dark:text-surface-100">{prettyPathLabel(param.param)}</h5>
-													<p class="text-xs text-surface-700 dark:text-surface-300 leading-snug">{param.description}</p>
-													<p class="text-[11px] text-surface-700 dark:text-surface-300">Key: <span class="font-mono text-surface-900 dark:text-surface-100 break-all">{param.param}</span></p>
+												<div class="rounded-lg border border-surface-300/70 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 p-3 space-y-2 shadow-sm">
+													<h5 class="text-sm font-semibold text-surface-900 dark:text-surface-100">{prettyPathLabel(param.param)}</h5>
+													<p class="text-xs text-surface-600 dark:text-surface-400 leading-snug">{param.description}</p>
+													<p class="text-[11px] text-surface-600 dark:text-surface-400">Key: <span class="font-mono text-surface-900 dark:text-surface-100 break-all">{param.param}</span></p>
 													<input
 														type="text"
 														class="input w-full h-11 px-3 font-mono text-[13px] rounded-lg bg-white dark:bg-surface-700 border border-surface-400 dark:border-surface-500 text-surface-900 dark:text-surface-100"
@@ -897,17 +884,17 @@
 								{/if}
 
 								{#if selectedWorkflowReportingPathParams.length > 0 || selectedWorkflowOtherOptionalPathParams.length > 0}
-									<details class="rounded-xl border border-amber-300/55 dark:border-amber-700/45 bg-amber-50/50 dark:bg-amber-950/15 p-4">
-										<summary class="cursor-pointer text-sm font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">Optional Reporting / Advanced Paths</summary>
-										<p class="mt-2 text-xs text-surface-700 dark:text-surface-300">Used by report/figure extras or advanced custom workflows. Keep defaults unless you have a specific reason to change.</p>
+									<details class="rounded-xl border border-surface-300/70 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 p-4">
+										<summary class="cursor-pointer text-sm font-semibold uppercase tracking-wide text-surface-900 dark:text-surface-100">Optional Reporting / Advanced Paths</summary>
+										<p class="mt-2 text-xs text-surface-600 dark:text-surface-400">Used by report/figure extras or advanced custom workflows. Keep defaults unless you have a specific reason to change.</p>
 										<div class="mt-4 grid gap-3 xl:grid-cols-2">
 											{#each [...selectedWorkflowReportingPathParams, ...selectedWorkflowOtherOptionalPathParams] as param}
 												{@const parts = param.param.split('.')}
 												{@const value = getNestedValue(formValues, parts)}
-												<div class="rounded-lg border border-amber-300/45 dark:border-amber-700/35 bg-white dark:bg-surface-800 p-3 space-y-2 shadow-sm">
-													<h5 class="text-sm font-semibold text-surface-800 dark:text-surface-100">{prettyPathLabel(param.param)}</h5>
-													<p class="text-xs text-surface-700 dark:text-surface-300 leading-snug">{param.description}</p>
-													<p class="text-[11px] text-surface-700 dark:text-surface-300">Key: <span class="font-mono text-surface-900 dark:text-surface-100 break-all">{param.param}</span></p>
+												<div class="rounded-lg border border-surface-300/70 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 p-3 space-y-2 shadow-sm">
+													<h5 class="text-sm font-semibold text-surface-900 dark:text-surface-100">{prettyPathLabel(param.param)}</h5>
+													<p class="text-xs text-surface-600 dark:text-surface-400 leading-snug">{param.description}</p>
+													<p class="text-[11px] text-surface-600 dark:text-surface-400">Key: <span class="font-mono text-surface-900 dark:text-surface-100 break-all">{param.param}</span></p>
 													<input
 														type="text"
 														class="input w-full h-11 px-3 font-mono text-[13px] rounded-lg bg-white dark:bg-surface-700 border border-surface-400 dark:border-surface-500 text-surface-900 dark:text-surface-100"
@@ -924,25 +911,25 @@
 						{/if}
 
 						{#if selectableTools.length > 0}
-							<div class="rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-900/40 p-4 space-y-4">
+							<div class="rounded-xl border border-surface-300/70 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 p-4 space-y-4">
 								<div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
 									<div>
-										<h4 class="text-lg font-semibold text-secondary-500">Tool Defaults</h4>
-										<p class="text-xs text-surface-500 dark:text-surface-400 mt-1">
+										<h4 class="text-lg font-semibold text-surface-900 dark:text-surface-100">Tool Defaults</h4>
+										<p class="text-xs text-surface-600 dark:text-surface-400 mt-1">
 											Pick the tools you want selected by default for this workflow on Analyze.
 											Required tools stay enabled, but the rest can be saved as your preferred starting point.
 										</p>
 									</div>
 									<div class="flex flex-wrap gap-2">
-										<button type="button" onclick={selectAllWorkflowTools} class="text-xs px-3 py-1 rounded border border-surface-300 dark:border-surface-600 hover:bg-surface-200 dark:hover:bg-surface-700">Select all</button>
-										<button type="button" onclick={selectNoWorkflowTools} class="text-xs px-3 py-1 rounded border border-surface-300 dark:border-surface-600 hover:bg-surface-200 dark:hover:bg-surface-700">Select none</button>
+										<button type="button" onclick={selectAllWorkflowTools} class="text-xs px-3 py-1 rounded border border-surface-300 dark:border-surface-600 bg-surface-100 dark:bg-surface-800 hover:bg-surface-200 dark:hover:bg-surface-700">Select all</button>
+										<button type="button" onclick={selectNoWorkflowTools} class="text-xs px-3 py-1 rounded border border-surface-300 dark:border-surface-600 bg-surface-100 dark:bg-surface-800 hover:bg-surface-200 dark:hover:bg-surface-700">Select none</button>
 									</div>
 								</div>
 								<div class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
 									{#each selectableTools as tool}
 										{@const isRequired = requiredToolKeys.includes(tool.key)}
 										{@const isDisabled = disabledTools.has(tool.key)}
-										<label class="flex items-start gap-3 rounded-lg border border-surface-300 dark:border-surface-600 px-3 py-2 {isRequired ? 'bg-surface-200/60 dark:bg-surface-700/40 opacity-90' : isDisabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:bg-surface-200 dark:hover:bg-surface-700'}">
+										<label class="flex items-start gap-3 rounded-lg border border-surface-300 dark:border-surface-600 px-3 py-2 bg-surface-100 dark:bg-surface-800 {isRequired ? 'opacity-90' : isDisabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:bg-surface-200 dark:hover:bg-surface-700'}">
 											<input
 												type="checkbox"
 												checked={selectedToolKeys.has(tool.key) && !isDisabled}
@@ -952,15 +939,15 @@
 											/>
 											<div class="min-w-0">
 												<div class="flex items-center gap-2">
-													<span class="text-sm font-semibold">{tool.name}</span>
+													<span class="text-sm font-semibold text-surface-900 dark:text-surface-100">{tool.name}</span>
 													{#if isRequired}
-														<span class="text-[10px] uppercase tracking-wide rounded-full bg-primary-500/15 text-primary-700 dark:text-primary-300 px-2 py-0.5">Required</span>
+														<span class="text-[10px] uppercase tracking-wide rounded-full bg-surface-200 text-surface-700 dark:bg-surface-800 dark:text-surface-300 px-2 py-0.5">Required</span>
 													{/if}
 													{#if isDisabled}
-														<span class="text-[10px] uppercase tracking-wide rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-0.5">License required</span>
+														<span class="text-[10px] uppercase tracking-wide rounded-full bg-surface-200 text-surface-700 dark:bg-surface-800 dark:text-surface-300 px-2 py-0.5">License required</span>
 													{/if}
 												</div>
-												<p class="mt-1 text-xs text-surface-500 leading-snug">{tool.purpose}</p>
+												<p class="mt-1 text-xs text-surface-600 dark:text-surface-400 leading-snug">{tool.purpose}</p>
 											</div>
 										</label>
 									{/each}
@@ -969,12 +956,12 @@
 						{/if}
 
 						{#if selectedWorkflowPathId === 'margie_sb'}
-							<div class="rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-900/40 p-4">
+							<div class="rounded-xl border border-surface-300/70 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 p-4">
 								<label class="flex items-start gap-3 cursor-pointer">
 									<input type="checkbox" bind:checked={generateFullOperonMap} class="mt-1 accent-primary-500" />
 									<div class="min-w-0">
-										<h4 class="text-lg font-semibold text-secondary-500">Full-genome operon map</h4>
-										<p class="mt-1 text-xs text-surface-500 dark:text-surface-400 leading-snug">
+										<h4 class="text-lg font-semibold text-surface-900 dark:text-surface-100">Full-genome operon map</h4>
+										<p class="mt-1 text-xs text-surface-600 dark:text-surface-400 leading-snug">
 											Draw operon diagrams for <span class="font-semibold">every</span> gene in each
 											genome (all operon sizes, paginated) — not just the representative examples.
 											Heavier (~3-4&nbsp;min/genome) and runs after scoring. Saved with this
@@ -1000,7 +987,7 @@
 			</section>
 		{/if}
 	{:else if connected}
-		<section class="card p-6 bg-surface-100 dark:bg-surface-800 text-center space-y-4">
+		<section class="card p-6 bg-surface-100 dark:bg-surface-800 border border-surface-300/70 dark:border-surface-700 shadow-sm text-center space-y-4">
 			<p class="text-surface-600 dark:text-surface-300 text-lg">No configuration found</p>
 			<p class="text-surface-500 text-sm">
 				The file <code class="font-mono text-sm bg-surface-200 dark:bg-surface-700 px-2 py-1 rounded">~/.config/bioinformatics-tools/config.yaml</code> does not exist on {user?.cluster_host}.
@@ -1032,12 +1019,12 @@ compute:
 	{/if}
 
 	<!-- Cluster Credentials Section -->
-	<section class="card p-6 bg-surface-100 dark:bg-surface-800">
+	<section class="card p-6 bg-surface-100 dark:bg-surface-800 border border-surface-300/70 dark:border-surface-700 shadow-sm">
 		<details class="group">
-			<summary class="cursor-pointer list-none rounded-xl border border-secondary-200/70 dark:border-secondary-900/40 bg-gradient-to-br from-secondary-50 to-surface-50 dark:from-secondary-950/30 dark:to-surface-900/70 p-4 shadow-sm">
+			<summary class="cursor-pointer list-none rounded-xl border border-surface-300/80 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 p-4 shadow-sm">
 				<div class="flex items-center justify-between gap-4">
 					<h2 class="text-2xl font-bold text-secondary-700 dark:text-secondary-300">Cluster Credentials</h2>
-					<div class="text-xs font-semibold uppercase tracking-wide text-surface-600 dark:text-surface-300">
+					<div class="text-xs font-semibold uppercase tracking-wide text-surface-600 dark:text-surface-400">
 						<span class="group-open:hidden">Expand</span>
 						<span class="hidden group-open:inline">Collapse</span>
 					</div>
@@ -1126,3 +1113,4 @@ compute:
 		</details>
 	</section>
 </div>
+

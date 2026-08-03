@@ -11,10 +11,11 @@
 
 	interface Entry { name: string; type: 'file' | 'directory'; size: number; }
 
-	// Start in the user's own home directory; the backend expands "~".
-	// Depot/other shared paths remain reachable by typing or navigating to
-	// them, but only work if the user's cluster account has permission.
-	const START_PATH = '~';
+	// Start in the user's config directory so config.yaml is visible right
+	// away. Other paths (depot, home, etc.) remain reachable by typing or
+	// navigating to them, but only work if the user's cluster account has
+	// permission.
+	const START_PATH = '~/.config/bioinformatics-tools';
 
 	let currentPath = $state('');
 	let pathInput = $state(START_PATH);
@@ -32,6 +33,11 @@
 	let viewTruncated = $state(false);
 	let viewLoading = $state(false);
 	let viewError = $state('');
+	let viewEditing = $state(false);
+	let viewSaving = $state(false);
+	let viewSaveError = $state('');
+	let viewSaved = $state(false);
+	let viewPath = $state('');
 
 	// Breadcrumb segments with their cumulative absolute paths.
 	let crumbs = $derived.by(() => {
@@ -73,6 +79,10 @@
 		return dir.replace(/\/+$/, '') + '/' + name;
 	}
 
+	function isEditableTextFile(name: string): boolean {
+		return /\.(ya?ml|json|txt|csv|tsv|ini|cfg|conf|log|md|sh|py|ts|js|svelte)$/i.test(name);
+	}
+
 	function openDir(name: string) { browse(joinPath(currentPath, name)); }
 	function goUp() { if (currentPath !== '/') browse(parent); }
 	function submitPath(e: Event) { e.preventDefault(); if (pathInput.trim()) browse(pathInput.trim()); }
@@ -80,12 +90,16 @@
 	async function viewFile(name: string) {
 		const path = joinPath(currentPath, name);
 		viewOpen = true;
+		viewPath = path;
 		viewName = name;
 		viewContent = '';
 		viewBinary = false;
 		viewTruncated = false;
 		viewError = '';
 		viewLoading = true;
+		viewEditing = false;
+		viewSaveError = '';
+		viewSaved = false;
 		try {
 			const res = await fetch(
 				`${API_URL}/v1/ssh/browse_view?path=${encodeURIComponent(path)}`,
@@ -100,6 +114,7 @@
 			viewBinary = data.binary;
 			viewTruncated = data.truncated;
 			viewContent = data.content;
+			viewEditing = !data.binary && isEditableTextFile(name);
 		} catch (e) {
 			viewError = e instanceof Error ? e.message : 'Failed to open file';
 		} finally {
@@ -107,7 +122,36 @@
 		}
 	}
 
-	function closeView() { viewOpen = false; }
+	function closeView() { viewOpen = false; viewEditing = false; }
+
+	function startEdit() { viewEditing = true; viewSaveError = ''; viewSaved = false; }
+
+	function cancelEdit() { viewEditing = false; viewFile(viewName); }
+
+	async function saveFile() {
+		viewSaving = true;
+		viewSaveError = '';
+		viewSaved = false;
+		try {
+			const res = await fetch(`${API_URL}/v1/ssh/browse_save`, {
+				method: 'POST',
+				headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+				body: JSON.stringify({ path: viewPath, content: viewContent, truncated: viewTruncated }),
+			});
+			if (res.status === 401) { handle401(); return; }
+			if (!res.ok) {
+				const body = await res.json().catch(() => null);
+				throw new Error(body?.detail || 'Failed to save file');
+			}
+			viewEditing = false;
+			viewSaved = true;
+			setTimeout(() => { viewSaved = false; }, 2000);
+		} catch (e) {
+			viewSaveError = e instanceof Error ? e.message : 'Failed to save file';
+		} finally {
+			viewSaving = false;
+		}
+	}
 
 	async function copyPath(name: string) {
 		const path = joinPath(currentPath, name);
@@ -214,7 +258,7 @@
 								onclick={() => viewFile(entry.name)}
 								class="btn btn-sm variant-filled-primary px-2 text-xs"
 							>
-								👁 View
+								{isEditableTextFile(entry.name) ? '✎ Edit' : '👁 View'}
 							</button>
 						{/if}
 					</li>
@@ -239,7 +283,22 @@
 		>
 			<div class="flex items-center justify-between px-4 py-3 border-b border-surface-300 dark:border-surface-700">
 				<h2 class="font-mono text-sm font-semibold truncate">{viewName}</h2>
-				<button type="button" onclick={closeView} class="btn btn-sm variant-soft px-3">✕ Close</button>
+				<div class="flex items-center gap-2">
+					{#if viewSaved}
+						<span class="text-xs text-green-600 dark:text-green-400 font-semibold">✓ Saved</span>
+					{/if}
+					{#if !viewLoading && !viewError && !viewBinary}
+						{#if viewEditing}
+							<button type="button" onclick={cancelEdit} disabled={viewSaving} class="btn btn-sm variant-soft px-3">Cancel</button>
+							<button type="button" onclick={saveFile} disabled={viewSaving} class="btn btn-sm variant-filled-primary px-3">
+								{viewSaving ? 'Saving...' : '💾 Save'}
+							</button>
+						{:else}
+							<button type="button" onclick={startEdit} class="btn btn-sm variant-filled-secondary px-3">✎ Edit</button>
+						{/if}
+					{/if}
+					<button type="button" onclick={closeView} class="btn btn-sm variant-soft px-3">✕ Close</button>
+				</div>
 			</div>
 			<div class="p-4 overflow-auto">
 				{#if viewLoading}
@@ -251,12 +310,27 @@
 						This looks like a binary file and can't be shown as text. Use “Copy path” to reference it.
 					</p>
 				{:else}
+					{#if viewSaveError}
+						<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-3">{viewSaveError}</div>
+					{/if}
 					{#if viewTruncated}
 						<div class="bg-amber-100 border border-amber-400 text-amber-800 px-3 py-2 rounded mb-3 text-sm">
-							Showing the first part of a large file (truncated).
+							{viewEditing
+								? "This file is too large to edit in-browser (only the first part was loaded)."
+								: 'Showing the first part of a large file (truncated).'}
 						</div>
 					{/if}
-					<pre class="text-xs font-mono whitespace-pre overflow-x-auto">{viewContent}</pre>
+					{#if viewEditing}
+						<textarea
+							bind:value={viewContent}
+							disabled={viewSaving || viewTruncated}
+							rows="24"
+							spellcheck="false"
+							class="w-full text-xs font-mono px-3 py-2 rounded border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-900 resize-y"
+						></textarea>
+					{:else}
+						<pre class="text-xs font-mono whitespace-pre overflow-x-auto">{viewContent}</pre>
+					{/if}
 				{/if}
 			</div>
 		</div>
