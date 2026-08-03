@@ -373,6 +373,30 @@
 			workflowSections[selectedWorkflowPathId].run_full_operon_map = generateFullOperonMap;
 		}
 
+		// When db_root is edited in Workflow Specific Settings, keep per-tool db
+		// paths in sync so the saved YAML reflects the user's chosen root.
+		const margieSbSection = workflowSections.margie_sb;
+		if (margieSbSection && typeof margieSbSection.db_root === 'string') {
+			const rawDbRoot = margieSbSection.db_root.trim();
+			if (rawDbRoot) {
+				const dbRoot = rawDbRoot.replace(/\/+$/, '');
+				const margieSbWorkflow = workflows.find(wf => wf.id === 'margie_sb');
+				const dbToolKeys = new Set<string>();
+				for (const param of (margieSbWorkflow?.configurable_params || [])) {
+					const key = String(param?.param || '');
+					const match = key.match(/^margie_sb\.([a-z0-9_]+)\.db$/i);
+					if (match?.[1]) dbToolKeys.add(match[1]);
+				}
+
+				for (const key of dbToolKeys) {
+					if (!margieSbSection[key] || typeof margieSbSection[key] !== 'object') {
+						margieSbSection[key] = {};
+					}
+					margieSbSection[key].db = `${dbRoot}/${key}`;
+				}
+			}
+		}
+
 		for (const wfId of workflowOrder) {
 			if (workflowSections[wfId]) {
 				configToSave[wfId] = workflowSections[wfId];
