@@ -248,6 +248,33 @@
 		selectedTools = enforceRequiredTools(nextSelection);
 	});
 
+	// Sanity Checks (Quick Example / Fresh Test). These endpoints require auth
+	// like everything else on this page -- the original version predated login
+	// and sent no headers.
+	async function runWorkflow(endpoint: string, setLoading: (v: boolean) => void) {
+		try {
+			setLoading(true);
+			error = '';
+			const response = await fetch(`${API_URL}/v1/workflows/${endpoint}`, {
+				method: 'POST',
+				headers: authHeaders(),
+			});
+			if (response.status === 401) { handle401(); return; }
+			if (!response.ok) {
+				const errData = await response.json().catch(() => ({}));
+				throw new Error(errData.detail || `Failed to run ${endpoint}`);
+			}
+			const data = await response.json();
+			if (data.job_id) {
+				goto(`/jobs/${data.job_id}`);
+			}
+		} catch (e) {
+			error = e instanceof Error ? e.message : `Failed to run ${endpoint}`;
+		} finally {
+			setLoading(false);
+		}
+	}
+
 	async function handleAnalyze() {
 		if (selectableTools.length > 0 && selectedForRun.size === 0) {
 			error = 'Select at least one tool to run, or check them all to run the full pipeline.';
