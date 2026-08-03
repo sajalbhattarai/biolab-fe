@@ -791,36 +791,36 @@
 		</section>
 
 		{#if workflowPathSettings.length > 0}
-			<section class="card p-6 bg-surface-100 dark:bg-surface-800 mt-8">
-				<h2 class="text-2xl font-bold text-primary-500">Workflow Specific Settings</h2>
-				<p class="text-sm text-surface-500 dark:text-surface-400 mb-4">
+			<section class="card p-6 bg-white dark:bg-surface-900 mt-8 border border-surface-300/70 dark:border-surface-700 shadow-sm">
+				<h2 class="text-2xl font-bold text-primary-700 dark:text-primary-300">Workflow Specific Settings</h2>
+				<p class="text-sm text-surface-700 dark:text-surface-300 mb-4">
 					Edit per-workflow roots and defaults in one place.
 					This section stays collapsed until you need it, but it is the source of truth for Analyze defaults.
 				</p>
 				<details class="group">
-					<summary class="cursor-pointer list-none rounded-2xl border border-primary-200/70 dark:border-primary-900/40 bg-gradient-to-br from-primary-50 to-surface-50 dark:from-primary-950/30 dark:to-surface-900/70 p-5 shadow-sm">
+					<summary class="cursor-pointer list-none rounded-2xl border border-primary-300/80 dark:border-primary-700/50 bg-gradient-to-br from-primary-100 to-surface-100 dark:from-primary-900/35 dark:to-surface-800 p-5 shadow-md">
 						<div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-end">
-							<div class="text-xs font-semibold uppercase tracking-wide text-surface-500 group-open:hidden">Expand</div>
-							<div class="text-xs font-semibold uppercase tracking-wide text-surface-500 hidden group-open:block">Collapse</div>
+							<div class="text-xs font-semibold uppercase tracking-wide text-surface-700 dark:text-surface-300 group-open:hidden">Expand</div>
+							<div class="text-xs font-semibold uppercase tracking-wide text-surface-700 dark:text-surface-300 hidden group-open:block">Collapse</div>
 						</div>
 					</summary>
 
-					<div class="mt-4 rounded-xl border border-surface-200 dark:border-surface-700 bg-white/80 dark:bg-surface-800/80 p-4 space-y-4">
+					<div class="mt-4 rounded-xl border border-surface-300 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/90 p-4 space-y-4">
 						<div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
 							<div>
-								<h3 class="text-lg font-semibold text-primary-600 dark:text-primary-400">
+								<h3 class="text-lg font-semibold text-primary-700 dark:text-primary-300">
 									{selectedWorkflowPathSettings?.label}
 								</h3>
-								<p class="mt-1 text-xs text-surface-500">SIF/database roots and default input/output paths for this workflow.</p>
+								<p class="mt-1 text-xs text-surface-700 dark:text-surface-300">SIF/database roots and default input/output paths for this workflow.</p>
 							</div>
 							<div class="min-w-[16rem]">
-								<label class="block text-xs font-semibold uppercase tracking-wide text-surface-500 mb-2" for="workflow-path-picker">
+								<label class="block text-xs font-semibold uppercase tracking-wide text-surface-700 dark:text-surface-300 mb-2" for="workflow-path-picker">
 									Workflow
 								</label>
 								<select
 									id="workflow-path-picker"
 									bind:value={selectedWorkflowPathId}
-									class="input w-full rounded-lg bg-white dark:bg-surface-700 border border-surface-300 dark:border-surface-600 px-4 py-2"
+									class="input w-full rounded-lg bg-white dark:bg-surface-700 border border-surface-400 dark:border-surface-500 px-4 py-2 text-surface-900 dark:text-surface-100"
 								>
 									{#each workflowPathSettings as wfSettings}
 										<option value={wfSettings.id}>{wfSettings.label}</option>
@@ -831,48 +831,48 @@
 
 						{#if selectedWorkflowPathSettings}
 							<div class="space-y-5">
-								<div class="rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-900/30 p-4">
+								<div class="rounded-xl border border-primary-300/60 dark:border-primary-700/50 bg-primary-50/55 dark:bg-primary-950/20 p-4">
 									<h4 class="text-sm font-semibold uppercase tracking-wide text-primary-600 dark:text-primary-300">Required for Run</h4>
-									<p class="mt-1 text-xs text-surface-500">Set these first. These are the core workflow roots plus required shared stores needed for normal execution.</p>
+									<p class="mt-1 text-xs text-surface-700 dark:text-surface-300">Set these first. These are the core workflow roots plus required shared stores needed for normal execution.</p>
 									<div class="mt-4 grid gap-3 xl:grid-cols-2">
 										{#each selectedWorkflowRequiredPathParams as param}
 											{@const parts = param.param.split('.')}
 											{@const value = getNestedValue(formValues, parts)}
-											<div class="rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 p-3 space-y-2">
+											<div class="rounded-lg border border-primary-300/45 dark:border-primary-700/45 bg-white dark:bg-surface-800 p-3 space-y-2 shadow-sm">
 												<div class="flex items-start justify-between gap-2">
 													<h5 class="text-sm font-semibold text-surface-800 dark:text-surface-100">{prettyPathLabel(param.param)}</h5>
-													<span class="text-[10px] uppercase tracking-wide rounded-full bg-primary-500/15 text-primary-700 dark:text-primary-300 px-2 py-0.5">Required</span>
+													<span class="text-[10px] uppercase tracking-wide rounded-full bg-primary-600/20 text-primary-800 dark:text-primary-200 px-2 py-0.5 border border-primary-400/40 dark:border-primary-600/40">Required</span>
 												</div>
-												<p class="text-xs text-surface-500 leading-snug">{param.description}</p>
-												<p class="text-[11px] text-surface-500">Key: <span class="font-mono text-surface-700 dark:text-surface-300 break-all">{param.param}</span></p>
+												<p class="text-xs text-surface-700 dark:text-surface-300 leading-snug">{param.description}</p>
+												<p class="text-[11px] text-surface-700 dark:text-surface-300">Key: <span class="font-mono text-surface-900 dark:text-surface-100 break-all">{param.param}</span></p>
 												<input
 													type="text"
-													class="input w-full h-11 px-3 font-mono text-[13px] rounded-lg bg-white dark:bg-surface-700 border border-surface-300 dark:border-surface-600"
+													class="input w-full h-11 px-3 font-mono text-[13px] rounded-lg bg-white dark:bg-surface-700 border border-surface-400 dark:border-surface-500 text-surface-900 dark:text-surface-100"
 													placeholder={param.default !== null && param.default !== undefined ? String(param.default) : ''}
 													value={value ?? ''}
 													oninput={(event) => handleWorkflowPathInput(param.param, event)}
 												/>
-												<p class="text-[11px] text-surface-500">Default: <span class="font-mono break-all">{String(param.default ?? '')}</span></p>
+												<p class="text-[11px] text-surface-700 dark:text-surface-300">Default: <span class="font-mono break-all">{String(param.default ?? '')}</span></p>
 											</div>
 										{/each}
 									</div>
 								</div>
 
 								{#if selectedWorkflowRecordKeepingPathParams.length > 0}
-									<details class="rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-900/30 p-4">
-										<summary class="cursor-pointer text-sm font-semibold uppercase tracking-wide text-secondary-600 dark:text-secondary-300">Optional Record-Keeping Paths</summary>
-										<p class="mt-2 text-xs text-surface-500">Archives and historical exports. Helpful for tracking and reproducibility, but not required for core execution.</p>
+									<details class="rounded-xl border border-emerald-300/55 dark:border-emerald-700/45 bg-emerald-50/50 dark:bg-emerald-950/15 p-4">
+										<summary class="cursor-pointer text-sm font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">Optional Record-Keeping Paths</summary>
+										<p class="mt-2 text-xs text-surface-700 dark:text-surface-300">Archives and historical exports. Helpful for tracking and reproducibility, but not required for core execution.</p>
 										<div class="mt-4 grid gap-3 xl:grid-cols-2">
 											{#each selectedWorkflowRecordKeepingPathParams as param}
 												{@const parts = param.param.split('.')}
 												{@const value = getNestedValue(formValues, parts)}
-												<div class="rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 p-3 space-y-2">
+												<div class="rounded-lg border border-emerald-300/45 dark:border-emerald-700/35 bg-white dark:bg-surface-800 p-3 space-y-2 shadow-sm">
 													<h5 class="text-sm font-semibold text-surface-800 dark:text-surface-100">{prettyPathLabel(param.param)}</h5>
-													<p class="text-xs text-surface-500 leading-snug">{param.description}</p>
-													<p class="text-[11px] text-surface-500">Key: <span class="font-mono text-surface-700 dark:text-surface-300 break-all">{param.param}</span></p>
+													<p class="text-xs text-surface-700 dark:text-surface-300 leading-snug">{param.description}</p>
+													<p class="text-[11px] text-surface-700 dark:text-surface-300">Key: <span class="font-mono text-surface-900 dark:text-surface-100 break-all">{param.param}</span></p>
 													<input
 														type="text"
-														class="input w-full h-11 px-3 font-mono text-[13px] rounded-lg bg-white dark:bg-surface-700 border border-surface-300 dark:border-surface-600"
+														class="input w-full h-11 px-3 font-mono text-[13px] rounded-lg bg-white dark:bg-surface-700 border border-surface-400 dark:border-surface-500 text-surface-900 dark:text-surface-100"
 														placeholder={param.default !== null && param.default !== undefined ? String(param.default) : ''}
 														value={value ?? ''}
 														oninput={(event) => handleWorkflowPathInput(param.param, event)}
@@ -884,20 +884,20 @@
 								{/if}
 
 								{#if selectedWorkflowReportingPathParams.length > 0 || selectedWorkflowOtherOptionalPathParams.length > 0}
-									<details class="rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-900/30 p-4">
-										<summary class="cursor-pointer text-sm font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-300">Optional Reporting / Advanced Paths</summary>
-										<p class="mt-2 text-xs text-surface-500">Used by report/figure extras or advanced custom workflows. Keep defaults unless you have a specific reason to change.</p>
+									<details class="rounded-xl border border-amber-300/55 dark:border-amber-700/45 bg-amber-50/50 dark:bg-amber-950/15 p-4">
+										<summary class="cursor-pointer text-sm font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">Optional Reporting / Advanced Paths</summary>
+										<p class="mt-2 text-xs text-surface-700 dark:text-surface-300">Used by report/figure extras or advanced custom workflows. Keep defaults unless you have a specific reason to change.</p>
 										<div class="mt-4 grid gap-3 xl:grid-cols-2">
 											{#each [...selectedWorkflowReportingPathParams, ...selectedWorkflowOtherOptionalPathParams] as param}
 												{@const parts = param.param.split('.')}
 												{@const value = getNestedValue(formValues, parts)}
-												<div class="rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 p-3 space-y-2">
+												<div class="rounded-lg border border-amber-300/45 dark:border-amber-700/35 bg-white dark:bg-surface-800 p-3 space-y-2 shadow-sm">
 													<h5 class="text-sm font-semibold text-surface-800 dark:text-surface-100">{prettyPathLabel(param.param)}</h5>
-													<p class="text-xs text-surface-500 leading-snug">{param.description}</p>
-													<p class="text-[11px] text-surface-500">Key: <span class="font-mono text-surface-700 dark:text-surface-300 break-all">{param.param}</span></p>
+													<p class="text-xs text-surface-700 dark:text-surface-300 leading-snug">{param.description}</p>
+													<p class="text-[11px] text-surface-700 dark:text-surface-300">Key: <span class="font-mono text-surface-900 dark:text-surface-100 break-all">{param.param}</span></p>
 													<input
 														type="text"
-														class="input w-full h-11 px-3 font-mono text-[13px] rounded-lg bg-white dark:bg-surface-700 border border-surface-300 dark:border-surface-600"
+														class="input w-full h-11 px-3 font-mono text-[13px] rounded-lg bg-white dark:bg-surface-700 border border-surface-400 dark:border-surface-500 text-surface-900 dark:text-surface-100"
 														placeholder={param.default !== null && param.default !== undefined ? String(param.default) : ''}
 														value={value ?? ''}
 														oninput={(event) => handleWorkflowPathInput(param.param, event)}
