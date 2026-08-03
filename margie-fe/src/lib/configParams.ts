@@ -9,7 +9,22 @@
 // Per-workflow root-path settings (sif_path, db_root, input_path, output_path).
 export const PATH_PARAM_KEYS = ['sif_path', 'db_root', 'input_path', 'output_path'];
 
+// Extra workflow-scoped storage paths that do not fit the simple two-part
+// '<workflow>.<key>' convention but should still appear under Workflow Settings.
+const EXTENDED_WORKFLOW_PATH_PARAMS = new Set([
+	'margie_sb.operon_database.occ_reference_pkl',
+	'margie_sb.fingerprint_database.path',
+	'margie_sb.genome_pool.path',
+	'margie_sb.scoring_results_historical.path',
+	'margie_sb.final_tables_depot.path',
+	'margie_sb.report_figures.operon_db',
+	'margie_sb.sqlite_pipeline_snapshot.path',
+]);
+
 export function isWorkflowPathParam(param: string): boolean {
+	if (EXTENDED_WORKFLOW_PATH_PARAMS.has(param)) {
+		return true;
+	}
 	const parts = param.split('.');
 	return parts.length === 2 && PATH_PARAM_KEYS.includes(parts[1]);
 }
