@@ -218,6 +218,57 @@
 		return [...unique.values()];
 	});
 
+	const CORE_WORKFLOW_PATH_KEYS = new Set(['sif_path', 'db_root', 'input_path', 'output_path']);
+
+	function isCoreWorkflowPath(paramKey: string): boolean {
+		const leaf = paramKey.split('.').pop() || '';
+		return CORE_WORKFLOW_PATH_KEYS.has(leaf);
+	}
+
+	function pathParamPriority(paramKey: string): number {
+		const leaf = paramKey.split('.').pop() || '';
+		const order = ['sif_path', 'db_root', 'input_path', 'output_path'];
+		const idx = order.indexOf(leaf);
+		return idx >= 0 ? idx : 100;
+	}
+
+	function prettyPathLabel(paramKey: string): string {
+		const leaf = paramKey.split('.').pop() || paramKey;
+		const labels: Record<string, string> = {
+			sif_path: 'Container Root (SIF)',
+			db_root: 'Database Root',
+			input_path: 'Default Input Path',
+			output_path: 'Default Output Path',
+			path: 'Shared Path',
+			operon_db: 'Report Figures Operon DB',
+			occ_reference_pkl: 'OCC Reference Database',
+		};
+		return labels[leaf] || leaf.replace(/_/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase());
+	}
+
+	function handleWorkflowPathInput(paramKey: string, event: Event) {
+		const target = event.currentTarget as HTMLInputElement;
+		updateFormValue(paramKey, target.value);
+	}
+
+	let selectedWorkflowPathParamsOrdered = $derived.by(() => {
+		const params = [...(selectedWorkflowPathSettings?.params ?? [])];
+		return params.sort((a: any, b: any) => {
+			const pa = pathParamPriority(a.param);
+			const pb = pathParamPriority(b.param);
+			if (pa !== pb) return pa - pb;
+			return a.param.localeCompare(b.param);
+		});
+	});
+
+	let selectedWorkflowCorePathParams = $derived.by(() =>
+		selectedWorkflowPathParamsOrdered.filter((param: any) => isCoreWorkflowPath(param.param))
+	);
+
+	let selectedWorkflowSharedPathParams = $derived.by(() =>
+		selectedWorkflowPathParamsOrdered.filter((param: any) => !isCoreWorkflowPath(param.param))
+	);
+
 	// Build config to save - syncs YAML to match what's shown in the UI, while
 	// PRESERVING any existing keys the UI doesn't know about (e.g. top-level
 	// legacy paths like sif_path/db_root/base_input_dir that predate the
@@ -732,21 +783,62 @@
 						</div>
 
 						{#if selectedWorkflowPathSettings}
-							<div class="space-y-1">
-								{#each selectedWorkflowPathSettings.params as param}
-									{@const parts = param.param.split('.')}
-									{@const value = getNestedValue(formValues, parts)}
+							<div class="space-y-5">
+								<div class="rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-900/30 p-4">
+									<h4 class="text-sm font-semibold uppercase tracking-wide text-primary-600 dark:text-primary-300">Core Workflow Roots</h4>
+									<p class="mt-1 text-xs text-surface-500">Primary defaults used by Analyze for container lookup and run input/output locations.</p>
+									<div class="mt-4 grid gap-3 xl:grid-cols-2">
+										{#each selectedWorkflowCorePathParams as param}
+											{@const parts = param.param.split('.')}
+											{@const value = getNestedValue(formValues, parts)}
+											<div class="rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 p-3 space-y-2">
+												<div class="flex items-start justify-between gap-2">
+													<h5 class="text-sm font-semibold text-surface-800 dark:text-surface-100">{prettyPathLabel(param.param)}</h5>
+													<span class="text-[10px] uppercase tracking-wide rounded-full bg-primary-500/15 text-primary-700 dark:text-primary-300 px-2 py-0.5">Core</span>
+												</div>
+												<p class="text-xs text-surface-500 leading-snug">{param.description}</p>
+												<p class="text-[11px] text-surface-500">Key: <span class="font-mono text-surface-700 dark:text-surface-300 break-all">{param.param}</span></p>
+												<input
+													type="text"
+													class="input w-full h-11 px-3 font-mono text-[13px] rounded-lg bg-white dark:bg-surface-700 border border-surface-300 dark:border-surface-600"
+													placeholder={param.default !== null && param.default !== undefined ? String(param.default) : ''}
+													value={value ?? ''}
+													oninput={(event) => handleWorkflowPathInput(param.param, event)}
+												/>
+												<p class="text-[11px] text-surface-500">Default: <span class="font-mono break-all">{String(param.default ?? '')}</span></p>
+											</div>
+										{/each}
+									</div>
+								</div>
 
-									<ConfigField
-										param={param.param}
-										type={param.type}
-										description={param.description}
-										default={param.default}
-										required={false}
-										value={value}
-										onchange={(newVal) => updateFormValue(param.param, newVal)}
-									/>
-								{/each}
+								{#if selectedWorkflowSharedPathParams.length > 0}
+									<div class="rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-900/30 p-4">
+										<h4 class="text-sm font-semibold uppercase tracking-wide text-secondary-600 dark:text-secondary-300">Shared Stores and Archives</h4>
+										<p class="mt-1 text-xs text-surface-500">Cross-run paths for reference databases, archives, and reporting inputs. Directory-only values are accepted for file-backed keys.</p>
+										<div class="mt-4 grid gap-3 xl:grid-cols-2">
+											{#each selectedWorkflowSharedPathParams as param}
+												{@const parts = param.param.split('.')}
+												{@const value = getNestedValue(formValues, parts)}
+												<div class="rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 p-3 space-y-2">
+													<div class="flex items-start justify-between gap-2">
+														<h5 class="text-sm font-semibold text-surface-800 dark:text-surface-100">{prettyPathLabel(param.param)}</h5>
+														<span class="text-[10px] uppercase tracking-wide rounded-full bg-secondary-500/15 text-secondary-700 dark:text-secondary-300 px-2 py-0.5">Shared</span>
+													</div>
+													<p class="text-xs text-surface-500 leading-snug">{param.description}</p>
+													<p class="text-[11px] text-surface-500">Key: <span class="font-mono text-surface-700 dark:text-surface-300 break-all">{param.param}</span></p>
+													<input
+														type="text"
+														class="input w-full h-11 px-3 font-mono text-[13px] rounded-lg bg-white dark:bg-surface-700 border border-surface-300 dark:border-surface-600"
+														placeholder={param.default !== null && param.default !== undefined ? String(param.default) : ''}
+														value={value ?? ''}
+														oninput={(event) => handleWorkflowPathInput(param.param, event)}
+													/>
+													<p class="text-[11px] text-surface-500">Default: <span class="font-mono break-all">{String(param.default ?? '')}</span></p>
+												</div>
+											{/each}
+										</div>
+									</div>
+								{/if}
 							</div>
 						{/if}
 
