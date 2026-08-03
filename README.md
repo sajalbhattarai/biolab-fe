@@ -15,7 +15,7 @@ Runs on **macOS** | **Windows** | **Linux**.
 <a href="#what-you-need"><b>What you need</b></a> &nbsp;|&nbsp;
 <a href="#quick-start"><b>Quick start</b></a> &nbsp;|&nbsp;
 <a href="#windows"><b>Windows</b></a> &nbsp;|&nbsp;
-<a href="#acknowledgements"><b>Acknowledgements</b></a> &nbsp;|&nbsp;
+<a href="#ai-usage-in-the-project"><b>AI usage in the project</b></a> &nbsp;|&nbsp;
 <a href="#more-details"><b>More details</b></a>
 
 </div>
@@ -269,7 +269,7 @@ cp -r /mnt/c/path/to/biolab-fe ~/biolab-fe && cd ~/biolab-fe && ./setup.sh
 
 <a id="more-details"></a>
 
-## Acknowledgements
+## AI usage in the project
 
 Phase 9-12 scripts were designed and implemented by **Sajal Bhattarai**.
 During script development, **Claude Sonnet 4.6** was used in interactive mode to improve robustness and debug issues.
