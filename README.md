@@ -289,6 +289,8 @@ APA 7th (software):
 
 Bhattarai, S., Deemer, D., & Lindemann, S. (2026). *biolab-fe* [Computer software]. https://github.com/sajalbhattarai/biolab-fe
 
+Use the exact version you ran by checking repository Releases, and include that release version number in your citation.
+
 Please also cite the individual tools and databases you use in the MARGIE pipeline, in accordance with their licensing and referencing requirements. The licensing gates during MARGIE runs provide the relevant licensing details, but you should still cross-check and confirm the requirements before publication.
 
 For machine-readable repository metadata, see [CITATION.cff](CITATION.cff).
