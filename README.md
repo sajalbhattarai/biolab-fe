@@ -283,15 +283,15 @@ These components were also manually checked and validated for intended purpose.
 
 This software is provided "as is", without warranty of any kind, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, and noninfringement.
 
-## Citation
+## Cite This Repository
 
 APA 7th (software):
 
 Bhattarai, S., Deemer, D., & Lindemann, S. (2026). *biolab-fe* [Computer software]. https://github.com/sajalbhattarai/biolab-fe
 
-Please also cite the individual tools and databases you use in the MARGIE pipeline, in accordance with their licensing and citation requirements. The licensing gates during MARGIE runs provide the relevant licensing details, but you should still cross-check and confirm the requirements before publication.
+Please also cite the individual tools and databases you use in the MARGIE pipeline, in accordance with their licensing and referencing requirements. The licensing gates during MARGIE runs provide the relevant licensing details, but you should still cross-check and confirm the requirements before publication.
 
-For machine-readable citation metadata, see [CITATION.cff](CITATION.cff).
+For machine-readable repository metadata, see [CITATION.cff](CITATION.cff).
 
 <details>
 <summary><b>More details on how it works</b></summary>
