@@ -1,6 +1,6 @@
 <div align="center">
 
-# MARGIE | Graphical User Interface (GUI)
+# MARGIE | Graphical User Interface (GUI) (update waiting, reflects the latest changes made, but is not in the current main branch, fixing some errors)
 
 **Mostly Automated Rapid Genome Inference Environment**
 <br>
