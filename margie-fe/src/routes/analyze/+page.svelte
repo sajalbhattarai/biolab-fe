@@ -113,6 +113,34 @@
 			.filter(p => isWorkflowPathParam(p.param) && !p.param.endsWith('.input_path') && !p.param.endsWith('.output_path'))
 	);
 
+	function prettyPathLabel(paramKey: string): string {
+		const humanize = (value: string): string =>
+			value
+				.replace(/_/g, ' ')
+				.replace(/\b\w/g, ch => ch.toUpperCase());
+
+		const fullKeyLabels: Record<string, string> = {
+			'margie_sb.fingerprint_database.path': 'Fingerprint Database TSV',
+			'margie_sb.genome_pool.path': 'Genome Pool Root',
+			'margie_sb.final_tables_depot.path': 'Final Tables Export Root',
+			'margie_sb.scoring_results_historical.path': 'Historical Scoring Archive Root',
+			'margie_sb.sqlite_pipeline_snapshot.path': 'SQLite Snapshot Queue Root',
+		};
+		if (fullKeyLabels[paramKey]) return fullKeyLabels[paramKey];
+
+		const parts = paramKey.split('.');
+		const leaf = parts[parts.length - 1] || paramKey;
+		const labels: Record<string, string> = {
+			sif_path: 'Container Root (SIF)',
+			db_root: 'Database Root',
+			operon_db: 'Report Figures Operon DB',
+			occ_reference_pkl: 'OCC Reference Database',
+		};
+		if (labels[leaf]) return labels[leaf];
+		if (leaf === 'path' && parts.length >= 2) return `${humanize(parts[parts.length - 2])} Path`;
+		return humanize(leaf);
+	}
+
 	function updateWorkflowPathValue(param: string, value: any) {
 		setNestedValue(userConfig, param.split('.'), value);
 		userConfig = { ...userConfig };
@@ -357,12 +385,12 @@
 	<!-- Tool Selection -->
 	<!-- Tool defaults are managed in Profile > Workflow Specific Settings. -->
 
-	<!-- Genome Path -->
+	<!-- Run Input -->
 	<div class="card p-6 bg-surface-100 dark:bg-surface-800 mb-8">
-		<h2 class="text-2xl font-semibold">Genome Path</h2>
+		<h2 class="text-2xl font-semibold">Run Input (Genome File or Folder)</h2>
 		<p class="text-sm text-surface-500 dark:text-surface-400 mb-4">
 			Enter the genome file you want to analyze, or a folder of genomes if the selected workflow supports batch input.
-			If left blank, Analyze will use your saved input_path default for this workflow from Profile.
+			If left blank, Analyze uses the workflow's saved default input from Profile.
 		</p>
 		<input
 			type="text"
@@ -374,12 +402,12 @@
 		/>
 	</div>
 
-	<!-- Output Directory -->
+	<!-- Run Output Base -->
 	<div class="card p-6 bg-surface-100 dark:bg-surface-800 mb-8">
-		<h2 class="text-2xl font-semibold">Output Directory</h2>
+		<h2 class="text-2xl font-semibold">Run Output Base Directory</h2>
 		<p class="text-sm text-surface-500 dark:text-surface-400 mb-4">
 			This is the base folder where results will be written. Analyze appends a timestamp automatically so each run lands in its own folder.
-			If left blank, Analyze uses your home directory, or your saved output_path default for this workflow.
+			If left blank, Analyze uses your home directory, or the workflow's saved default output directory.
 		</p>
 		<input
 			type="text"
@@ -392,16 +420,16 @@
 		</div>
 	</div>
 
-	<!-- Workflow Paths (sif_path / db_root) -->
+	<!-- Advanced Workflow Roots (sif_path / db_root) -->
 	{#if selectedWorkflowPathParams.length > 0}
 	<details class="mb-8 group">
 		<summary class="card p-4 bg-surface-100 dark:bg-surface-800 cursor-pointer list-none">
 			<div class="flex items-center justify-between">
 				<div>
-					<h2 class="text-2xl font-semibold">Workflow Paths</h2>
+					<h2 class="text-2xl font-semibold">Advanced Workflow Roots (Containers and Databases)</h2>
 					<p class="text-xs text-surface-500 dark:text-surface-400 mt-1">
-						These are advanced path overrides for the selected workflow, such as container roots or database roots.
-						You usually do not need to change these unless you are pointing the workflow at a custom installation or a non-default database location.
+						These are infrastructure roots for the selected workflow (for example SIF root and DB root).
+						Most users can leave these unchanged unless pointing to a custom installation or shared storage layout.
 					</p>
 				</div>
 				<span class="text-xs text-surface-500 group-open:hidden">Expand</span>
@@ -420,6 +448,7 @@
 					{@const value = getNestedValue(userConfig, param.param.split('.'))}
 					<ConfigField
 						param={param.param}
+						label={prettyPathLabel(param.param)}
 						type={param.type}
 						description={param.description}
 						default={param.default}

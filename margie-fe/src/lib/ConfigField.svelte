@@ -3,6 +3,7 @@
 
 	interface Props {
 		param: string;
+		label?: string;
 		type?: 'string' | 'int' | 'path' | 'number';
 		description: string;
 		default?: any;
@@ -14,6 +15,7 @@
 
 	let {
 		param,
+		label,
 		type = 'string',
 		description,
 		default: defaultValue = null,
@@ -24,7 +26,7 @@
 	}: Props = $props();
 
 	// Extract display name from param (e.g., "prodigal.threads" → "threads")
-	let displayName = $derived(param.split('.').pop() || param);
+	let displayName = $derived(label || param.split('.').pop() || param);
 	let isDefault = $derived(value === null || value === undefined || value === '');
 	let displayValue = $derived(isDefault ? (defaultValue ?? '') : value);
 
@@ -97,7 +99,8 @@
 
 	.config-field-compact {
 		padding: 0.75rem 0.875rem;
-		grid-template-columns: minmax(0, 1fr) minmax(12rem, 18rem);
+		grid-template-columns: minmax(16rem, 1fr) minmax(20rem, 1fr);
+		column-gap: 0.75rem;
 	}
 
 	:global(.dark) .config-field {
