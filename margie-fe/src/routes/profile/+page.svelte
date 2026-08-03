@@ -209,6 +209,9 @@
 	let requiredToolKeys = $derived(
 		selectableTools.filter(tool => REQUIRED_TOOL_KEYS.has(tool.key)).map(tool => tool.key)
 	);
+	let selectedToolCount = $derived(selectedToolKeys.size);
+	let selectedWorkflowLabel = $derived(selectedWorkflowPathSettings?.label ?? 'Workflow');
+	let globalMissingCount = $derived(missingRequiredFields.length);
 	let slurmParams = $derived.by(() => {
 		const params = workflows.flatMap(wf => wf.configurable_params || []).filter((param: any) => param.param.startsWith('compute.'));
 		const unique = new Map<string, any>();
@@ -657,9 +660,12 @@
 	{/if}
 
 	<!-- SSH Connection Status -->
-	<section class="card p-6 bg-surface-100 dark:bg-surface-800 border border-surface-300/70 dark:border-surface-700 shadow-sm w-full max-w-2xl">
-		<div class="mb-2 flex items-center gap-2">
+	<section class="card p-6 bg-surface-100 dark:bg-surface-800 border border-surface-300/70 dark:border-surface-700 border-t-4 border-t-teal-500 shadow-sm w-full max-w-2xl">
+		<div class="mb-2 flex items-center justify-between gap-2 flex-wrap">
 			<h2 class="text-2xl font-bold text-primary-500">SSH Connection</h2>
+			<div class="text-[11px] px-2 py-1 rounded-full border border-surface-300 dark:border-surface-600 bg-surface-200 dark:bg-surface-700 text-surface-700 dark:text-surface-300">
+				{checking ? 'Checking' : connected ? 'Connected' : 'Disconnected'}
+			</div>
 		</div>
 		<p class="text-sm text-surface-500 mb-3">Checks whether the backend can reach your cluster using the saved credentials.</p>
 		{#if checking}
@@ -724,11 +730,20 @@
 			<p class="text-surface-500">Loading configuration...</p>
 		</section>
 	{:else if connected && Object.keys(config).length > 0}
-		<section class="card p-6 bg-surface-100 dark:bg-surface-800 border border-surface-300/70 dark:border-surface-700 shadow-sm">
+		<section class="card p-6 bg-surface-100 dark:bg-surface-800 border border-surface-300/70 dark:border-surface-700 border-t-4 border-t-sky-500 shadow-sm">
 			<details class="group" open>
 				<summary class="cursor-pointer list-none rounded-xl border border-surface-300/80 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 p-4 shadow-sm">
-					<div class="flex items-center justify-between gap-4">
-						<h2 class="text-2xl font-bold text-primary-700 dark:text-primary-300">GLOBAL CONFIG</h2>
+					<div class="flex items-center justify-between gap-4 flex-wrap">
+						<div class="flex items-center gap-2">
+							<span class="text-base">🧭</span>
+							<h2 class="text-2xl font-bold text-primary-700 dark:text-primary-300">GLOBAL CONFIG</h2>
+							<div class="text-[11px] px-2 py-1 rounded-full border border-sky-300/60 dark:border-sky-700 bg-sky-100/70 dark:bg-sky-900/25 text-sky-800 dark:text-sky-200">Global</div>
+							{#if globalMissingCount > 0}
+								<div class="text-[11px] px-2 py-1 rounded-full border border-red-300/60 dark:border-red-700 bg-red-100/70 dark:bg-red-900/25 text-red-800 dark:text-red-200">
+									{globalMissingCount} required missing
+								</div>
+							{/if}
+						</div>
 						<div class="text-xs font-semibold uppercase tracking-wide text-surface-600 dark:text-surface-400">
 							<span class="group-open:hidden">Expand</span>
 							<span class="hidden group-open:inline">Collapse</span>
@@ -868,15 +883,21 @@
 		</section>
 
 		{#if workflowPathSettings.length > 0}
-			<section class="card p-6 bg-surface-100 dark:bg-surface-800 mt-8 border border-surface-300/70 dark:border-surface-700 shadow-sm">
-				<h2 class="text-2xl font-bold text-primary-700 dark:text-primary-300">WORKFLOW SPECIFIC CONFIG</h2>
+			<section class="card p-6 bg-surface-100 dark:bg-surface-800 mt-8 border border-surface-300/70 dark:border-surface-700 border-t-4 border-t-amber-500 shadow-sm">
+				<div class="flex flex-wrap items-center gap-2 mb-2">
+					<span class="text-base">🧬</span>
+					<h2 class="text-2xl font-bold text-primary-700 dark:text-primary-300">WORKFLOW SPECIFIC CONFIG</h2>
+					<div class="text-[11px] px-2 py-1 rounded-full border border-amber-300/60 dark:border-amber-700 bg-amber-100/70 dark:bg-amber-900/25 text-amber-800 dark:text-amber-200">{selectedWorkflowLabel}</div>
+					<div class="text-[11px] px-2 py-1 rounded-full border border-surface-300 dark:border-surface-600 bg-surface-200 dark:bg-surface-700 text-surface-700 dark:text-surface-300">{selectedToolCount} tools selected</div>
+				</div>
 				<p class="text-sm text-surface-700 dark:text-surface-300 mb-4">
 					Edit per-workflow roots and defaults in one place.
 					This section stays collapsed until you need it, but it is the source of truth for Analyze defaults.
 				</p>
 				<details class="group">
 					<summary class="cursor-pointer list-none rounded-2xl border border-surface-300/80 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 p-5 shadow-sm">
-						<div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-end">
+						<div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+							<div class="text-xs text-surface-600 dark:text-surface-400">{selectedWorkflowLabel}</div>
 							<div class="text-xs font-semibold uppercase tracking-wide text-surface-600 dark:text-surface-400 group-open:hidden">Expand</div>
 							<div class="text-xs font-semibold uppercase tracking-wide text-surface-600 dark:text-surface-400 hidden group-open:block">Collapse</div>
 						</div>
@@ -1096,11 +1117,17 @@ compute:
 	{/if}
 
 	<!-- Cluster Credentials Section -->
-	<section class="card p-6 bg-surface-100 dark:bg-surface-800 border border-surface-300/70 dark:border-surface-700 shadow-sm">
+	<section class="card p-6 bg-surface-100 dark:bg-surface-800 border border-surface-300/70 dark:border-surface-700 border-t-4 border-t-slate-500 shadow-sm">
 		<details class="group">
 			<summary class="cursor-pointer list-none rounded-xl border border-surface-300/80 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 p-4 shadow-sm">
-				<div class="flex items-center justify-between gap-4">
-					<h2 class="text-2xl font-bold text-secondary-700 dark:text-secondary-300">Cluster Credentials</h2>
+				<div class="flex items-center justify-between gap-4 flex-wrap">
+					<div class="flex items-center gap-2">
+						<span class="text-base">🔐</span>
+						<h2 class="text-2xl font-bold text-secondary-700 dark:text-secondary-300">Cluster Credentials</h2>
+						{#if user?.cluster_host}
+							<div class="text-[11px] px-2 py-1 rounded-full border border-surface-300 dark:border-surface-600 bg-surface-200 dark:bg-surface-700 text-surface-700 dark:text-surface-300">{user.cluster_host}</div>
+						{/if}
+					</div>
 					<div class="text-xs font-semibold uppercase tracking-wide text-surface-600 dark:text-surface-400">
 						<span class="group-open:hidden">Expand</span>
 						<span class="hidden group-open:inline">Collapse</span>
