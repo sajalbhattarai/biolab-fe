@@ -279,6 +279,10 @@ These scripts were manually validated for intended behavior.
 Visualization and LLM work, including the operon circular diagram page, HTML creation, and interactive chat mode, were refined with interactive-mode assistance from **Claude Opus 4.8**.
 These components were also manually checked and validated for intended purpose.
 
+## Disclaimer
+
+This software is provided "as is", without warranty of any kind, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, and noninfringement.
+
 <details>
 <summary><b>More details on how it works</b></summary>
 
