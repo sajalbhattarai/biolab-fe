@@ -316,43 +316,67 @@
 		)
 	);
 
-	// Build config to save - syncs YAML to match what's shown in the UI, while
-	// PRESERVING any existing keys the UI doesn't know about (e.g. top-level
-	// legacy paths like sif_path/db_root/base_input_dir that predate the
-	// namespaced margie_sb.* convention). Without this, saving anything here
-	// would silently drop those keys on the next write, since the PUT
-	// endpoint overwrites the whole file rather than merging.
+	// Build config to save as a canonical, workflow-segregated payload.
+	// This intentionally does not preserve legacy top-level workflow keys;
+	// save writes the structure shown by the current UI model.
 	function buildConfigToSave(): Record<string, any> {
-		const configToSave: Record<string, any> = JSON.parse(JSON.stringify(config));
-		const allParams = workflows.flatMap(wf => wf.configurable_params || []);
+		const workflowSections: Record<string, any> = {};
+		const computeSection: Record<string, any> = {};
 
-		// Write ALL parameters to YAML - what you see is what you get
-		allParams.forEach((param: any) => {
-			const parts = param.param.split('.');
-			const value = getNestedValue(formValues, parts);
+		// Keep this stable for deterministic YAML order and easier diffs.
+		const workflowOrder = workflows.map(wf => wf.id);
 
-			// Use the value from form if set, otherwise use the default
-			const finalValue = (value !== null && value !== undefined && value !== '')
-				? value
-				: param.default;
+		// Write workflow params under each workflow section. If a param is already
+		// namespaced (e.g. margie_sb.sif_path), keep that shape; otherwise scope it
+		// to its workflow (e.g. prodigal.threads -> margie.prodigal.threads).
+		for (const workflow of workflows) {
+			const wfId = workflow.id;
+			const wfParams = workflow.configurable_params || [];
 
-			// Write to config if we have a value (even if it's the default)
-			if (finalValue !== null && finalValue !== undefined) {
-				setNestedValue(configToSave, parts, finalValue);
+			for (const param of wfParams) {
+				if (!param?.param) continue;
+
+				const parts = param.param.split('.');
+				const scopedParts = parts[0] === wfId ? parts : [wfId, ...parts];
+				// Read either legacy top-level values (prodigal.threads) or the
+				// canonical workflow-scoped values (margie.prodigal.threads).
+				const value = getNestedValue(formValues, parts) ?? getNestedValue(formValues, scopedParts);
+				const finalValue = (value !== null && value !== undefined && value !== '')
+					? value
+					: param.default;
+
+				if (finalValue === null || finalValue === undefined) continue;
+
+				if (param.param.startsWith('compute.')) {
+					setNestedValue(computeSection, parts.slice(1), finalValue);
+					continue;
+				}
+
+				if (!workflowSections[wfId]) workflowSections[wfId] = {};
+				setNestedValue(workflowSections[wfId], scopedParts.slice(1), finalValue);
 			}
-		});
+		}
 
-		// Always include main_database - use value or default
+		// Always include main_database - use value or default.
 		const mainDb = formValues.main_database?.trim();
-		configToSave.main_database = mainDb || '~/.local/share/bioinformatics-tools/my-db.db';
+		const configToSave: Record<string, any> = {
+			main_database: mainDb || '~/.local/share/bioinformatics-tools/my-db.db',
+			compute: computeSection,
+		};
 
 		if (selectedWorkflowPathId) {
-			if (!configToSave[selectedWorkflowPathId]) configToSave[selectedWorkflowPathId] = {};
-			configToSave[selectedWorkflowPathId].default_selected_tools = Array.from(selectedToolKeys).join(',');
+			if (!workflowSections[selectedWorkflowPathId]) workflowSections[selectedWorkflowPathId] = {};
+			workflowSections[selectedWorkflowPathId].default_selected_tools = Array.from(selectedToolKeys).join(',');
 			// Persisted opt-in: the backend reads this server-side at run time
 			// (does not depend on the Analyze-page payload), gating the full
 			// per-genome operon atlas.
-			configToSave[selectedWorkflowPathId].run_full_operon_map = generateFullOperonMap;
+			workflowSections[selectedWorkflowPathId].run_full_operon_map = generateFullOperonMap;
+		}
+
+		for (const wfId of workflowOrder) {
+			if (workflowSections[wfId]) {
+				configToSave[wfId] = workflowSections[wfId];
+			}
 		}
 
 		return configToSave;
