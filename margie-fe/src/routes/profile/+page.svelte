@@ -397,6 +397,35 @@
 			}
 		}
 
+		// Backward-compat migration for older configs that persisted GTDB-Tk with
+		// stale low-resource defaults despite workflow-scoped settings.
+		if (margieSbSection) {
+			if (!margieSbSection.gtdbtk || typeof margieSbSection.gtdbtk !== 'object') {
+				margieSbSection.gtdbtk = {};
+			}
+			if (!margieSbSection.phase2 || typeof margieSbSection.phase2 !== 'object') {
+				margieSbSection.phase2 = {};
+			}
+
+			const g = margieSbSection.gtdbtk;
+			const phase2 = margieSbSection.phase2;
+			if (!g.partition || String(g.partition).trim().toLowerCase() === 'cpu') {
+				g.partition = 'highmem';
+			}
+			if (!phase2.partition || String(phase2.partition).trim().toLowerCase() === 'cpu') {
+				phase2.partition = 'highmem';
+			}
+			if (!g.threads || Number(g.threads) <= 8) {
+				g.threads = 64;
+			}
+			if (!g.mem_mb || Number(g.mem_mb) <= 4000) {
+				g.mem_mb = 460000;
+			}
+			if (!g.runtime || Number(g.runtime) <= 120) {
+				g.runtime = 240;
+			}
+		}
+
 		for (const wfId of workflowOrder) {
 			if (workflowSections[wfId]) {
 				configToSave[wfId] = workflowSections[wfId];
