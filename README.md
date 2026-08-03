@@ -200,7 +200,8 @@ powershell -ExecutionPolicy Bypass -File .\setup.ps1
 
 After that, `margie` works from any terminal, or from **Start menu → MARGIE**. That's the whole thing.
 
-### What setup does, and what it asks
+<details>
+<summary><b>What setup does, and what it asks</b></summary>
 
 It checks before it changes anything, and shows you the result first. Anything already installed is reported as found and skipped. Then it asks — one question at a time, and you can say no to any of them:
 
@@ -214,6 +215,8 @@ It checks before it changes anything, and shows you the result first. Anything a
 It then asks the same three cluster questions as on macOS, and you're done.
 
 If setup tells you to restart Windows, restart and run the exact same command again — everything already finished is detected and skipped.
+
+</details>
 
 <details>
 <summary><b>Why does Windows need WSL?</b></summary>
