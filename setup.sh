@@ -85,7 +85,8 @@ fi
 # OPTIONAL: fill these in to skip the questions below.
 #   HPC_USER     your HPC username        (e.g. jdoe)
 #   HPC_ADDR     your HPC address         (e.g. cluster.university.edu)
-#   BACKEND_DIR  full path to the bioinformatics-tools folder on the HPC
+#   BACKEND_DIR  backend folder on the HPC. Default if left blank:
+#                /home/<HPC_USER>/bioinformatics-tools
 #                (the folder that contains pyproject.toml)
 # ---------------------------------------------------------------------------
 HPC_USER=""
@@ -146,6 +147,10 @@ else
     echo
     prompt_for "Your HPC username, e.g. jdoe (may differ from your computer's username)" HPC_USER
     prompt_for "Your HPC address, e.g. cluster.university.edu" HPC_ADDR
+    # Most users keep repos under /home/<user>, so offer that as the default.
+    if [ -z "$BACKEND_DIR" ] && [ -n "$HPC_USER" ]; then
+        BACKEND_DIR="/home/$HPC_USER/bioinformatics-tools"
+    fi
     prompt_for "Full path to the bioinformatics-tools folder on the HPC (contains pyproject.toml)" BACKEND_DIR
 fi
 
@@ -160,6 +165,8 @@ cat > "$MARGIE" <<EOF
 # margie launcher — EDIT THESE if your backend location on the HPC changes:
 export HPC_HOST="$HPC_HOST"
 export BACKEND_DIR="$BACKEND_DIR"
+# export BACKEND_REPO_URL="https://github.com/sajalbhattarai/bioinformatics-tools.git"   # used only if BACKEND_DIR is missing on HPC
+# export BACKEND_ARCHIVE_URL="https://codeload.github.com/sajalbhattarai/bioinformatics-tools/tar.gz/refs/heads/main"   # used when git is missing on HPC
 # export HPC_FRONTEND_DIR=""   # path to margie-fe on the HPC — only for: margie --sync (dev)
 exec "$REPO/scripts/margie.sh" "\$@"
 EOF

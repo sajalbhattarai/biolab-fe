@@ -55,6 +55,8 @@ cd biolab-fe
 margie
 ```
 
+If the backend folder does not exist yet on the HPC, MARGIE automatically clones `bioinformatics-tools` into the `BACKEND_DIR` path you provide.
+
 <a id="run-linux"></a>
 
 ## HOW TP RUN --LINUX USERS
@@ -85,6 +87,8 @@ cd biolab-fe
 ./setup.sh
 margie
 ```
+
+If the backend folder does not exist yet on the HPC, MARGIE automatically clones `bioinformatics-tools` into the `BACKEND_DIR` path you provide.
 
 <a id="run-windows"></a>
 
@@ -121,6 +125,8 @@ cd biolab-fe
 ./setup.sh
 margie
 ```
+
+If the backend folder does not exist yet on the HPC, MARGIE automatically clones `bioinformatics-tools` into the `BACKEND_DIR` path you provide.
 
 If browser does not open automatically, open:
 

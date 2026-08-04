@@ -36,6 +36,11 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 
 : "${HPC_HOST:?not set — run ./setup.sh (or set HPC_HOST at the top of ~/bin/margie)}"
 : "${BACKEND_DIR:?not set — run ./setup.sh (or set BACKEND_DIR at the top of ~/bin/margie)}"
+# If BACKEND_DIR does not exist on the HPC yet, clone this repo there.
+BACKEND_REPO_URL="${BACKEND_REPO_URL:-https://github.com/sajalbhattarai/bioinformatics-tools.git}"
+# Optional override when git is missing on the HPC.
+BACKEND_ARCHIVE_URL="${BACKEND_ARCHIVE_URL:-}"
+BACKEND_PARENT="$(dirname "$BACKEND_DIR")"
 
 SYNC="no"
 if [ "${1:-}" = "--sync" ]; then
@@ -406,7 +411,40 @@ fi
 # Prepare the environment on the HPC -- errors are shown (not hidden), so a wrong
 # BACKEND_DIR or a uv failure is obvious instead of a silent missing venv.
 if ! ssh -S "$SOCKET" "$HPC_HOST" "
-    cd '$BACKEND_DIR' 2>/dev/null || { echo '  BACKEND_DIR not found on the HPC: $BACKEND_DIR' >&2; exit 3; }
+    if [ ! -d '$BACKEND_DIR' ]; then
+        echo '  BACKEND_DIR not found on the HPC: $BACKEND_DIR'
+        mkdir -p '$BACKEND_PARENT' || { echo '  Could not create parent directory for BACKEND_DIR.' >&2; exit 3; }
+        if command -v git >/dev/null 2>&1; then
+            echo '  Cloning backend there from: $BACKEND_REPO_URL'
+            git clone '$BACKEND_REPO_URL' '$BACKEND_DIR' || { echo '  Backend clone failed.' >&2; exit 3; }
+        elif command -v curl >/dev/null 2>&1 && command -v tar >/dev/null 2>&1; then
+            echo '  git not found on HPC; using archive download fallback.'
+            tmpdir=\$(mktemp -d /tmp/margie-backend-XXXXXX 2>/dev/null || mktemp -d) || { echo '  Could not create temp directory.' >&2; exit 3; }
+            archive="\$tmpdir/backend.tar.gz"
+            fetched=no
+            if [ -n '$BACKEND_ARCHIVE_URL' ]; then
+                curl -fsSL '$BACKEND_ARCHIVE_URL' -o "\$archive" && fetched=yes
+            else
+                for u in \
+                    https://codeload.github.com/sajalbhattarai/bioinformatics-tools/tar.gz/refs/heads/main \
+                    https://codeload.github.com/sajalbhattarai/bioinformatics-tools/tar.gz/refs/heads/master \
+                    https://codeload.github.com/sajalbhattarai/bioinformatics-tools/tar.gz/refs/heads/under-development
+                do
+                    curl -fsSL "\$u" -o "\$archive" && fetched=yes && break
+                done
+            fi
+            [ "\$fetched" = yes ] || { rm -rf "\$tmpdir"; echo '  Could not download backend archive. Set BACKEND_ARCHIVE_URL or install git on HPC.' >&2; exit 3; }
+            tar -xzf "\$archive" -C "\$tmpdir" || { rm -rf "\$tmpdir"; echo '  Could not extract backend archive.' >&2; exit 3; }
+            src=\$(find "\$tmpdir" -mindepth 1 -maxdepth 1 -type d | head -n 1)
+            [ -n "\$src" ] || { rm -rf "\$tmpdir"; echo '  Backend archive is empty.' >&2; exit 3; }
+            mv "\$src" '$BACKEND_DIR' || { rm -rf "\$tmpdir"; echo '  Could not place backend into BACKEND_DIR.' >&2; exit 3; }
+            rm -rf "\$tmpdir"
+        else
+            echo '  Missing git on HPC, and no curl+tar fallback available. Install git or curl+tar.' >&2
+            exit 2
+        fi
+    fi
+    cd '$BACKEND_DIR' 2>/dev/null || { echo '  BACKEND_DIR not accessible on the HPC: $BACKEND_DIR' >&2; exit 3; }
     [ -f pyproject.toml ] || { echo '  No pyproject.toml in $BACKEND_DIR -- point BACKEND_DIR at the bioinformatics-tools folder itself.' >&2; exit 4; }
     export PATH=\"\$HOME/.local/bin:\$HOME/.cargo/bin:\$PATH\"
     command -v uv >/dev/null 2>&1 || { echo '  uv is not installed on the HPC (or not on PATH).' >&2; exit 5; }
