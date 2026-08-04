@@ -1,0 +1,30 @@
+# ---------------------------------------------------------------------------
+# Line endings
+#
+# Git for Windows installs with core.autocrlf=true, so without this file every
+# .sh in MARGIE is checked out on Windows with CRLF endings. That is not a
+# cosmetic difference: bash reads the trailing CR as part of the interpreter
+# name, so setup inside WSL dies with
+#
+#     /usr/bin/env: 'bash\r': No such file or directory
+#
+# and setup fails before running. Pinning eol=lf makes the checkout correct on
+# every platform.
+# ---------------------------------------------------------------------------
+* text=auto
+
+*.sh   text eol=lf
+*.bash text eol=lf
+
+# cmd.exe is the fussy one, for any optional Windows batch wrappers.
+*.bat text eol=crlf
+
+# Never rewrite these.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.woff  binary
+*.woff2 binary

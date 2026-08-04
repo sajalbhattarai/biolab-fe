@@ -6,22 +6,16 @@ set -e
 
 # ---------------------------------------------------------------------------
 # Options
-#
-# --no-launch exists for the Windows installer (setup.ps1), which has its own
-# summary to print after this and cannot do that if setup execs into MARGIE.
 # ---------------------------------------------------------------------------
-LAUNCH="yes"
 DEPS="ask"
 for arg in "$@"; do
     case "$arg" in
         --check)     DEPS="check" ;;
         --yes|-y)    DEPS="yes" ;;
-        --no-launch) LAUNCH="no" ;;
         -h|--help)
-            echo "usage: ./setup.sh [--check] [--yes] [--no-launch]"
+            echo "usage: ./setup.sh [--check] [--yes]"
             echo "  --check      only report what is installed and what is missing"
             echo "  --yes        install anything missing without asking"
-            echo "  --no-launch  set everything up, but do not start MARGIE afterwards"
             exit 0 ;;
         *) echo "unknown option: $arg  (try --help)" >&2; exit 2 ;;
     esac
@@ -30,9 +24,39 @@ done
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
-REPO="$(cd "$(dirname "$0")/margie-fe" && pwd)"
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+REPO="$ROOT/margie-fe"
 BIN="$HOME/bin"
 MARGIE="$BIN/margie"
+
+# On Windows, a repo on /mnt/c works but is very slow and file watching is
+# unreliable. Auto-relocate into Linux home so users can just run ./setup.sh.
+IS_WSL="no"
+if [ -n "${WSL_DISTRO_NAME:-}" ] || grep -qi microsoft /proc/version 2>/dev/null; then
+    IS_WSL="yes"
+fi
+
+if [ "$IS_WSL" = "yes" ] && case "$ROOT" in /mnt/*) true ;; *) false ;; esac; then
+    DEST="$HOME/$(basename "$ROOT")"
+
+    echo
+    echo "MARGIE detected a Windows-disk clone at: $ROOT"
+    echo "It will continue from a Linux copy for speed and reliable reloads."
+
+    if [ -f "$DEST/setup.sh" ]; then
+        echo "Using existing Linux copy: $DEST"
+    elif [ -e "$DEST" ]; then
+        DEST="$HOME/$(basename "$ROOT")-wsl"
+        echo "Linux destination already exists; using: $DEST"
+        cp -a "$ROOT" "$DEST"
+    else
+        echo "Copying into Linux home: $DEST"
+        cp -a "$ROOT" "$DEST"
+    fi
+
+    echo "Continuing setup in: $DEST"
+    exec bash "$DEST/setup.sh" "$@"
+fi
 
 mkdir -p "$BIN"
 chmod +x "$REPO/scripts/margie.sh" "$REPO/scripts/check-deps.sh"
@@ -182,12 +206,6 @@ fi
 # ---------------------------------------------------------------------------
 # Launch (starts backend + tunnel + app, so you can register)
 # ---------------------------------------------------------------------------
-if [ "$LAUNCH" = "no" ]; then
-    echo
-    echo "Setup is done. Start MARGIE any time with:  margie"
-    exit 0
-fi
-
 echo
 echo "Starting MARGIE so you can register — this is exactly what 'margie' does every time."
 echo "In future, just open a new terminal and run:  margie"

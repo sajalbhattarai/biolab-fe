@@ -46,8 +46,8 @@ For backend pipeline, CLI, API, and backend runtime/config details, use **[bioin
 ./setup.sh --check          # macOS and Linux — just look, change nothing
 ```
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\setup.ps1 -Check    # Windows
+```bash
+./setup.sh --check          # Windows — run inside WSL (Ubuntu)
 ```
 
 You'll get a list like this, and anything already installed is left alone:
@@ -78,7 +78,7 @@ macOS — with [Homebrew](https://brew.sh):
 brew install node git
 ```
 
-Windows — these belong **inside WSL**, not in Windows itself, so run the Linux line below in your Ubuntu terminal. Installing Node into Windows with `winget` will not help MARGIE. (`setup.ps1` handles this for you.)
+Windows — these belong **inside WSL**, not in Windows itself, so run the Linux line below in your Ubuntu terminal. Installing Node into Windows with `winget` will not help MARGIE.
 
 Linux, WSL — Debian or Ubuntu:
 
@@ -121,10 +121,18 @@ macOS — with [Homebrew](https://brew.sh):
 brew install node git
 ```
 
-Windows — with winget (built into Windows 10/11):
+Windows — install these **inside WSL (Ubuntu)**, not in Windows itself:
 
-```powershell
-winget install OpenJS.NodeJS Git.Git
+```bash
+sudo apt update
+sudo apt install -y git
+```
+
+Then install a supported Node.js version in WSL (20.19+ | 22.12+ | 24+), for example:
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+sudo apt install -y nodejs
 ```
 
 Linux — Debian or Ubuntu:
@@ -141,7 +149,7 @@ node --version
 git --version
 ```
 
-If both print a version number, you're all set. (Node.js should be 18 or newer — if it's older, install the LTS version from [nodejs.org](https://nodejs.org/).)
+If both print a version number, you're all set. (Node.js must be 20.19+ | 22.12+ | 24+.)
 
 </details>
 
@@ -168,9 +176,9 @@ It asks for three things about your cluster:
 
 | Setup asks for | Example |
 | --- | --- |
-| **HPC username** — may differ from your computer's username | `jdoe` |
+| **HPC username** — may differ from your computer's username | `abc` |
 | **HPC address** | `cluster.university.edu` |
-| **Path to the backend [bioinformatics-tools](https://github.com/sajalbhattarai/bioinformatics-tools) folder on the HPC** — the backend repo folder that contains `pyproject.toml` | `/home/jdoe/bioinformatics-tools` |
+| **Path to the backend [bioinformatics-tools](https://github.com/sajalbhattarai/bioinformatics-tools) folder on the HPC** — the backend repo folder that contains `pyproject.toml` | `/home/abc/bioinformatics-tools` |
 
 > **Prefer not to be asked?** Open `setup.sh` and fill in `HPC_USER`, `HPC_ADDR`, and `BACKEND_DIR` at the top before running — setup then skips the questions. You can change any of these later in `~/bin/margie`.
 
@@ -190,15 +198,72 @@ It starts the backend on the cluster, connects to it, and opens the app at **htt
 
 ## Windows
 
-Download the app, then run setup once from PowerShell:
+Use this exact order on Windows:
+
+1. Install and open WSL (Ubuntu)
+2. Clone (or unzip) the repo
+3. Run `./setup.sh` inside WSL
+4. Start with `margie`
+
+### WSL step-by-step (recommended)
+
+Open **PowerShell as Administrator** and run:
 
 ```powershell
-git clone https://github.com/sajalbhattarai/biolab-fe.git
-cd biolab-fe
-powershell -ExecutionPolicy Bypass -File .\setup.ps1
+wsl --install -d Ubuntu
 ```
 
-After that, `margie` works from any terminal, or from **Start menu → MARGIE**. That's the whole thing.
+Restart Windows if prompted. Then open **Ubuntu** from the Start menu and finish first-run setup (create Linux username/password).
+
+In Ubuntu, verify Linux is ready:
+
+```bash
+uname -a
+```
+
+Clone and run setup in WSL:
+
+```bash
+git clone https://github.com/sajalbhattarai/biolab-fe.git
+cd biolab-fe
+bash ./setup.sh
+```
+
+If your folder has a different name (for example from a ZIP download), just `cd` into that folder and run `./setup.sh` there. The name does not matter.
+
+If setup needs to install required packages, Ubuntu may ask for your Linux password once (`sudo`). That is expected.
+
+When setup completes, start MARGIE from Ubuntu:
+
+```bash
+margie
+```
+
+Open this URL in Windows browser if it does not open automatically:
+
+```text
+http://localhost:5173
+```
+
+### If setup fails
+
+Use this manual recovery path:
+
+1. In PowerShell (Admin), run `wsl --status` and confirm WSL exists.
+2. In PowerShell, run `wsl -l -v` and confirm Ubuntu is listed.
+3. Open Ubuntu and run `cd ~`.
+4. Clone and setup inside Ubuntu:
+
+```bash
+git clone https://github.com/sajalbhattarai/biolab-fe.git
+cd biolab-fe
+bash ./setup.sh --check
+bash ./setup.sh
+```
+
+5. Start the app with `margie`.
+
+If you cloned under `/mnt/c/...`, just run `./setup.sh` from that clone. Setup will automatically move to Linux home and continue.
 
 <details>
 <summary><b>What setup does, and what it asks</b></summary>
@@ -209,7 +274,7 @@ It checks before it changes anything, and shows you the result first. Anything a
 | --- | --- |
 | **Install WSL?** | Turns on Windows Subsystem for Linux — a Microsoft feature of Windows. Needs administrator rights and one restart. |
 | **Install Ubuntu?** | About 1–2 GB. Ubuntu asks you to pick a Linux username and password (they're only for Linux — not your Windows or cluster login). |
-| **Copy your SSH key into Linux?** | Copies `C:\Users\you\.ssh` keys into Linux, where MARGIE can use them. Nothing already there is overwritten, and nothing leaves your computer. |
+| **Copy your SSH key into Linux?** | Copies `C:\Users\abc\.ssh` keys into Linux, where MARGIE can use them. Nothing already there is overwritten, and nothing leaves your computer. |
 | **Install Node.js and the rest?** | Only whatever was reported missing. |
 
 It then asks the same three cluster questions as on macOS, and you're done.
@@ -239,29 +304,26 @@ Rather than a second, weaker Windows-only version that would drift out of step, 
 <details>
 <summary><b>Windows troubleshooting</b></summary>
 
-**"running scripts is disabled on this system"** — use the full command, which allows the script just this once:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\setup.ps1
-```
-
-**"the requested operation requires elevation"** — right-click PowerShell, choose *Run as administrator*, then run it again. Setup offers to do this for you.
-
 **WSL install fails, or the machine hangs at "installing"** — virtualization may be switched off in your BIOS/UEFI, or blocked by your organisation. Check what setup found:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\setup.ps1 -Check
+wsl --status
+wsl -l -v
 ```
 
 **You can't install anything on this laptop** — you don't have to. The app is already online at **[bsp.anvilcloud.rcac.purdue.edu](https://bsp.anvilcloud.rcac.purdue.edu/)** and needs nothing installed.
 
 **Windows is older than build 19041** — WSL 2 can't run there. Update Windows, or use the hosted app above.
 
-**MARGIE is slow, or the page never reloads when you edit** — it's running from the Windows disk (`/mnt/c/...`) instead of from inside Linux. Setup normally moves it for you; if you cloned it again by hand, move it:
+**MARGIE is slow, or the page never reloads when you edit** — it's running from the Windows disk (`/mnt/c/...`) instead of from inside Linux. Run `./setup.sh` again from the repo root; setup will move it into Linux home automatically.
+
+**`/usr/bin/env: 'bash\r': No such file or directory`** — the scripts were checked out with Windows line endings. Fix it inside WSL with:
 
 ```bash
-cp -r /mnt/c/path/to/biolab-fe ~/biolab-fe && cd ~/biolab-fe && ./setup.sh
+sed -i 's/\r$//' setup.sh margie-fe/scripts/*.sh
 ```
+
+Git for Windows converts line endings by default; `.gitattributes` now pins the shell scripts to LF, so a fresh `git clone` is unaffected.
 
 **Nothing opens in the browser** — open **http://localhost:5173** yourself. The app is running inside Linux, but Windows can reach it at that address.
 
@@ -334,8 +396,8 @@ Besides a username and password, the Register page asks for your **cluster addre
 - **Where the backend lives, or which cluster you use** — edit these two lines at the top of `~/bin/margie` and save (no need to run setup again). `HPC_HOST` is your login as `username@address`:
 
   ```bash
-  export HPC_HOST="jdoe@cluster.university.edu"
-  export BACKEND_DIR="/home/jdoe/bioinformatics-tools"
+  export HPC_HOST="abc@cluster.university.edu"
+  export BACKEND_DIR="/home/abc/bioinformatics-tools"
   ```
 
 - **Your cluster login, and where results are saved** — open the **Profile** page in the app (under *Cluster Credentials* and *Config*).
@@ -348,10 +410,8 @@ The setup scripts:
 
 | Script | What it is |
 | --- | --- |
-| `setup.sh` | macOS, Linux and WSL entry point. `--check` reports only \| `--yes` installs without asking \| `--no-launch` sets up without starting MARGIE. |
-| `setup.ps1` | Windows entry point. Checks Windows, installs WSL and Ubuntu if you agree, moves MARGIE onto the Linux disk, then hands over to `setup.sh` inside WSL. `-Check` reports only. |
+| `setup.sh` | macOS, Linux and WSL entry point. `--check` reports only \| `--yes` installs without asking. |
 | `margie-fe/scripts/check-deps.sh` | The dependency check itself — same code on every platform, so what setup reports and what MARGIE needs can't drift apart. |
-| `margie-fe/scripts/wsl-bootstrap.sh` | The Linux half of the Windows installer: copies MARGIE off the Windows disk, and imports your SSH keys. |
 | `margie-fe/scripts/margie.sh` | The launcher `margie` runs. |
 
 </details>

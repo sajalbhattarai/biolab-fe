@@ -90,7 +90,11 @@ else
 fi
 
 PLATFORM="$OS"
-[ "$IS_WSL" = "yes" ] && PLATFORM="Windows (WSL — $WSL_DISTRO_NAME)"
+# Defaulted, because IS_WSL is also set by the /proc/version check above, and
+# that path leaves WSL_DISTRO_NAME unset -- under `sudo`, and on WSL 1, which
+# never exported it. `set -u` would then abort the whole dependency report on
+# the one platform this line exists for.
+[ "$IS_WSL" = "yes" ] && PLATFORM="Windows (WSL — ${WSL_DISTRO_NAME:-Linux})"
 
 # ---------------------------------------------------------------------------
 # Package names differ per distribution; keep the mapping in one place.
@@ -206,14 +210,14 @@ want lsof   optional "frees a port left behind by a previous run"
 # ---------------------------------------------------------------------------
 # Things that are not missing packages, but will still ruin the day
 # ---------------------------------------------------------------------------
-REPO="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)" || REPO=""
+APP_DIR="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)" || APP_DIR=""
 
 # A repo living on the Windows disk (/mnt/c/...) technically works, but every
 # npm install crawls across the filesystem bridge and vite's file watching does
 # not fire at all, so the app never reloads. It reads as "MARGIE is broken".
-if [ "$IS_WSL" = "yes" ] && case "$REPO" in /mnt/*) true ;; *) false ;; esac; then
+if [ "$IS_WSL" = "yes" ] && case "$APP_DIR" in /mnt/*) true ;; *) false ;; esac; then
     echo
-    report "location" "SLOW" "MARGIE is on the Windows disk ($REPO)"
+    report "location" "SLOW" "MARGIE is on the Windows disk ($APP_DIR)"
     WARNINGS="$WARNINGS location"
 fi
 
@@ -229,15 +233,22 @@ if [ -n "$WARNINGS" ]; then
     section "Worth fixing"
     case " $WARNINGS " in *" location "*)
         echo "  MARGIE is on the Windows side of the filesystem. Installing it inside"
-        echo "  Linux instead makes it much faster and lets the page reload as you work:"
+        echo "  Linux instead makes it much faster and lets the page reload as you work."
         echo
-        echo "    cp -r \"$REPO\" ~/biolab-fe && cd ~/biolab-fe && ./setup.sh"
+        echo "  Run ./setup.sh from the repo root and setup will move it automatically."
         ;;
     esac
 fi
 
 if [ "$MODE" = "check" ]; then
     [ -n "$MISSING_REQ" ] && exit 1
+    exit 0
+fi
+
+# Optional tools should never block setup or trigger a noisy install prompt.
+if [ -z "$MISSING_REQ" ] && [ -n "$MISSING_OPT" ] && [ "$MODE" = "ask" ]; then
+    echo
+    row "verdict" "ready (optional tools skipped)"
     exit 0
 fi
 
@@ -369,6 +380,7 @@ install_node_nvm() {
 section "Installing"
 
 FAILED=""
+NON_FATAL=""
 
 if [ "$NEED_NODE" = "yes" ]; then
     row "node" "installing…"
@@ -379,7 +391,7 @@ fi
 
 if [ -n "${PKGS# }" ]; then
     row "packages" "installing…${PKGS}"
-    install_pkgs "$PKGS" || FAILED="$FAILED packages"
+    install_pkgs "$PKGS" || NON_FATAL="$NON_FATAL packages"
 fi
 
 # ---------------------------------------------------------------------------
@@ -402,6 +414,10 @@ for t in npm git ssh curl; do
         FAILED="$FAILED $t"
     fi
 done
+
+if [ -n "$NON_FATAL" ]; then
+    report "optional" "skipped" "some optional packages could not be installed"
+fi
 
 echo
 if [ -n "$FAILED" ]; then
