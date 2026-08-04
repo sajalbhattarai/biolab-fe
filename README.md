@@ -20,13 +20,6 @@ Runs on **macOS** | **Windows** | **Linux**.
 
 </div>
 
-<details>
-<summary><b>Tip: Just want to use it?</b></summary>
-
-You don't have to install anything. The app is already online at **[bsp.anvilcloud.rcac.purdue.edu](https://bsp.anvilcloud.rcac.purdue.edu/)**. The steps below are only if you'd like to run your own copy.
-
-</details>
-
 ## Repo scope
 
 This repository is the **frontend** repository for MARGIE.
@@ -38,19 +31,39 @@ For backend pipeline, CLI, API, and backend runtime/config details, use **[bioin
 ## What you need
 
 - An account on your HPC cluster, with SSH set up — the same login you normally use to reach it.
-- **Node.js** (20.19+ | 22.12+ | 24 or newer), **Git**, and on Windows, **WSL**.
+- **Node.js** (20.19+ | 22.12+ | 24 or newer), **Git**, **SSH client**, **curl**.
+- On Windows: **WSL (Ubuntu)** is required and setup must run inside WSL.
 
-**You don't have to install those yourself.** Setup checks first, tells you what is already there, and asks before installing anything that isn't:
-
-```bash
-./setup.sh --check          # macOS and Linux — just look, change nothing
-```
+Check what is already installed:
 
 ```bash
-./setup.sh --check          # Windows — run inside WSL (Ubuntu)
+./setup.sh --check
 ```
 
-You'll get a list like this, and anything already installed is left alone:
+Install required packages inside Ubuntu/WSL if needed:
+
+```bash
+sudo apt update
+sudo apt install -y git openssh-client curl
+```
+
+Install a supported Node.js version:
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+sudo apt install -y nodejs
+```
+
+Verify:
+
+```bash
+node --version
+git --version
+ssh -V
+curl --version
+```
+
+Example check output:
 
 ```
   node       found     v22.20.0
@@ -62,100 +75,9 @@ You'll get a list like this, and anything already installed is left alone:
   verdict              missing: curl
 ```
 
-<details>
-<summary><b>Prefer to install Node.js and Git yourself?</b></summary>
-
-**The simplest way** — download and run the official installers:
-
-- Node.js — [nodejs.org](https://nodejs.org/) (choose the **LTS** version)
-- Git — [git-scm.com/downloads](https://git-scm.com/downloads)
-
-**Or use a package manager**
-
-macOS — with [Homebrew](https://brew.sh):
-
-```bash
-brew install node git
-```
-
-Windows — these belong **inside WSL**, not in Windows itself, so run the Linux line below in your Ubuntu terminal. Installing Node into Windows with `winget` will not help MARGIE.
-
-Linux, WSL — Debian or Ubuntu:
-
-```bash
-sudo apt update
-sudo apt install -y nodejs npm git
-```
-
-Distribution packages are usually too old: Ubuntu 22.04 pins `nodejs` to 12 and 24.04 to 18, and neither can build this app. The version rule is not a simple floor — the toolchain wants **20.19+ | 22.12+ | 24 or newer**, and `.npmrc` sets `engine-strict=true`, so a wrong Node makes `npm install` fail outright with `EBADENGINE` rather than warn. If yours does not match, get the current LTS:
-
-```bash
-curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
-sudo apt install -y nodejs
-```
-
-**Then check they're ready** — open a new terminal and run:
-
-```bash
-node --version
-git --version
-```
-
-If both print a version number, and Node matches the rule above, you're all set. `./setup.sh --check` will tell you either way.
-
-</details>
-
-<details>
-<summary><b>Don't have Node.js or Git yet?</b></summary>
-
-**The simplest way** — download and run the official installers:
-
-- Node.js — [nodejs.org](https://nodejs.org/) (choose the **LTS** version)
-- Git — [git-scm.com/downloads](https://git-scm.com/downloads)
-
-**Or use a package manager**
-
-macOS — with [Homebrew](https://brew.sh):
-
-```bash
-brew install node git
-```
-
-Windows — install these **inside WSL (Ubuntu)**, not in Windows itself:
-
-```bash
-sudo apt update
-sudo apt install -y git
-```
-
-Then install a supported Node.js version in WSL (20.19+ | 22.12+ | 24+), for example:
-
-```bash
-curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
-sudo apt install -y nodejs
-```
-
-Linux — Debian or Ubuntu:
-
-```bash
-sudo apt update
-sudo apt install -y nodejs npm git
-```
-
-**Then check they're ready** — open a new terminal and run:
-
-```bash
-node --version
-git --version
-```
-
-If both print a version number, you're all set. (Node.js must be 20.19+ | 22.12+ | 24+.)
-
-</details>
-
 ## Quick start
 
-> On Windows? Jump to **[Windows](#windows)** — it's one command, but a different one.
+> On Windows? Jump to **[Windows](#windows)** for the WSL flow.
 
 ### The first time
 
@@ -229,9 +151,9 @@ cd biolab-fe
 bash ./setup.sh
 ```
 
-If your folder has a different name (for example from a ZIP download), just `cd` into that folder and run `./setup.sh` there. The name does not matter.
+If your folder has a different name (for example from a ZIP download), just `cd` into that folder and run `./setup.sh`. Folder name does not matter.
 
-If setup needs to install required packages, Ubuntu may ask for your Linux password once (`sudo`). That is expected.
+During setup, Ubuntu may ask for your Linux password for `sudo` when installing required packages.
 
 When setup completes, start MARGIE from Ubuntu:
 
@@ -247,87 +169,35 @@ http://localhost:5173
 
 ### If setup fails
 
-Use this manual recovery path:
-
-1. In PowerShell (Admin), run `wsl --status` and confirm WSL exists.
-2. In PowerShell, run `wsl -l -v` and confirm Ubuntu is listed.
-3. Open Ubuntu and run `cd ~`.
-4. Clone and setup inside Ubuntu:
+Run these checks:
 
 ```bash
-git clone https://github.com/sajalbhattarai/biolab-fe.git
-cd biolab-fe
+wsl --status
+wsl -l -v
+cd /path/to/your/repo
 bash ./setup.sh --check
 bash ./setup.sh
 ```
 
-5. Start the app with `margie`.
+Common fixes:
 
-If you cloned under `/mnt/c/...`, just run `./setup.sh` from that clone. Setup will automatically move to Linux home and continue.
-
-<details>
-<summary><b>What setup does, and what it asks</b></summary>
-
-It checks before it changes anything, and shows you the result first. Anything already installed is reported as found and skipped. Then it asks — one question at a time, and you can say no to any of them:
-
-| It asks | What happens if you say yes |
-| --- | --- |
-| **Install WSL?** | Turns on Windows Subsystem for Linux — a Microsoft feature of Windows. Needs administrator rights and one restart. |
-| **Install Ubuntu?** | About 1–2 GB. Ubuntu asks you to pick a Linux username and password (they're only for Linux — not your Windows or cluster login). |
-| **Copy your SSH key into Linux?** | Copies `C:\Users\abc\.ssh` keys into Linux, where MARGIE can use them. Nothing already there is overwritten, and nothing leaves your computer. |
-| **Install Node.js and the rest?** | Only whatever was reported missing. |
-
-It then asks the same three cluster questions as on macOS, and you're done.
-
-If setup tells you to restart Windows, restart and run the exact same command again — everything already finished is detected and skipped.
-
-</details>
-
-<details>
-<summary><b>Why does Windows need WSL?</b></summary>
-
-MARGIE opens **one** SSH login to your cluster and reuses it for the tunnel and for every command it runs there. That's OpenSSH connection multiplexing (`ControlMaster`), and Windows' own `ssh.exe` doesn't implement it. The launcher also relies on Unix process and port tools that Windows doesn't have.
-
-Rather than a second, weaker Windows-only version that would drift out of step, Windows runs the *same* MARGIE inside WSL. So a fix for one platform is a fix for all of them.
-
-**What WSL is:** a feature of Windows itself, made by Microsoft. It is not a second operating system to boot into, it does not repartition your disk, and your Windows files stay where they are.
-
-| | |
-| --- | --- |
-| **Installs to** | `%LOCALAPPDATA%\WSL` (older builds: `%LOCALAPPDATA%\Packages`) |
-| **Disk space** | about 1–2 GB to start with |
-| **Needs** | administrator rights, and one restart |
-| **To remove it** | `wsl --unregister Ubuntu` — takes it away completely |
-
-</details>
-
-<details>
-<summary><b>Windows troubleshooting</b></summary>
-
-**WSL install fails, or the machine hangs at "installing"** — virtualization may be switched off in your BIOS/UEFI, or blocked by your organisation. Check what setup found:
+1. If WSL is not available, install it in PowerShell (Admin):
 
 ```powershell
-wsl --status
-wsl -l -v
+wsl --install -d Ubuntu
 ```
 
-**You can't install anything on this laptop** — you don't have to. The app is already online at **[bsp.anvilcloud.rcac.purdue.edu](https://bsp.anvilcloud.rcac.purdue.edu/)** and needs nothing installed.
-
-**Windows is older than build 19041** — WSL 2 can't run there. Update Windows, or use the hosted app above.
-
-**MARGIE is slow, or the page never reloads when you edit** — it's running from the Windows disk (`/mnt/c/...`) instead of from inside Linux. Run `./setup.sh` again from the repo root; setup will move it into Linux home automatically.
-
-**`/usr/bin/env: 'bash\r': No such file or directory`** — the scripts were checked out with Windows line endings. Fix it inside WSL with:
+2. If scripts have Windows line endings:
 
 ```bash
 sed -i 's/\r$//' setup.sh margie-fe/scripts/*.sh
 ```
 
-Git for Windows converts line endings by default; `.gitattributes` now pins the shell scripts to LF, so a fresh `git clone` is unaffected.
+3. If browser does not open automatically, open:
 
-**Nothing opens in the browser** — open **http://localhost:5173** yourself. The app is running inside Linux, but Windows can reach it at that address.
-
-</details>
+```text
+http://localhost:5173
+```
 
 <a id="more-details"></a>
 
