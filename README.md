@@ -31,10 +31,9 @@ For backend pipeline, CLI, API, and backend runtime/config details, use **[bioin
 
 ## HOW TO RUN --MAC USERS
 
-1. Open Terminal
+1. Open Terminal.
 
-2. Install required tools
-
+2. Install required tools.
 If you already have Homebrew:
 
 ```bash
@@ -55,7 +54,7 @@ If you do not want Homebrew, install from official sources:
 - curl (already included with macOS): https://curl.se/
 - OpenSSH (already included with macOS): https://www.openssh.com/
 
-3. Verify tools
+3. Verify tools.
 
 ```bash
 node --version
@@ -64,7 +63,7 @@ ssh -V
 curl --version
 ```
 
-4. Clone and run MARGIE
+4. Clone and run MARGIE.
 
 ```bash
 git clone https://github.com/sajalbhattarai/biolab-fe.git
@@ -74,7 +73,7 @@ cd biolab-fe
 margie
 ```
 
-5. During setup, enter your HPC login details when prompted:
+5. During setup, enter HPC login details when prompted:
 
 - HPC username (for example: abc)
 - HPC address (for example: cluster.university.edu)
@@ -86,10 +85,9 @@ If the backend folder does not exist yet on the HPC, MARGIE automatically clones
 
 ## HOW TO RUN --LINUX USERS
 
-1. Open a terminal on your Linux machine
+1. Open a terminal on your Linux machine.
 
-2. Install required tools
-
+2. Install required tools.
 
 ```bash
 sudo apt update
@@ -98,7 +96,7 @@ curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt install -y nodejs
 ```
 
-3. Verify tools
+3. Verify tools.
 
 ```bash
 node --version
@@ -107,7 +105,7 @@ ssh -V
 curl --version
 ```
 
-4. Clone and run MARGIE
+4. Clone and run MARGIE.
 
 ```bash
 git clone https://github.com/sajalbhattarai/biolab-fe.git
@@ -117,7 +115,7 @@ cd biolab-fe
 margie
 ```
 
-5. During setup, enter your HPC login details when prompted:
+5. During setup, enter HPC login details when prompted:
 
 - HPC username (for example: abc)
 - HPC address (for example: cluster.university.edu)
@@ -129,21 +127,20 @@ If the backend folder does not exist yet on the HPC, MARGIE automatically clones
 
 ## HOW TO RUN --WINDOWS USERS
 
-1. Open PowerShell as Administrator and install WSL + Ubuntu
-
+1. Open PowerShell as Administrator and install WSL + Ubuntu.
 
 ```powershell
 wsl --install -d Ubuntu
 ```
 
-2. Restart Windows if prompted
+2. Restart Windows if prompted.
 
-3. Open Ubuntu
+3. Open Ubuntu.
 
 - Start Menu -> search "Ubuntu" -> open it
 - Complete first-run Linux username/password setup
 
-4. Install required tools inside Ubuntu
+4. Install required tools inside Ubuntu.
 
 ```bash
 sudo apt update
@@ -157,7 +154,7 @@ Official package references:
 - Ubuntu packages (apt): https://packages.ubuntu.com/
 - NodeSource setup script: https://github.com/nodesource/distributions
 
-5. Verify tools inside Ubuntu
+5. Verify tools inside Ubuntu.
 
 ```bash
 node --version
@@ -166,7 +163,7 @@ ssh -V
 curl --version
 ```
 
-6. Clone and run MARGIE inside Ubuntu
+6. Clone and run MARGIE inside Ubuntu.
 
 ```bash
 git clone https://github.com/sajalbhattarai/biolab-fe.git
@@ -176,7 +173,7 @@ cd biolab-fe
 margie
 ```
 
-7. During setup, enter your HPC login details when prompted:
+7. During setup, enter HPC login details when prompted:
 
 - HPC username (for example: abc)
 - HPC address (for example: cluster.university.edu)
@@ -184,11 +181,7 @@ margie
 
 If the backend folder does not exist yet on the HPC, MARGIE automatically clones `bioinformatics-tools` into the `BACKEND_DIR` path you provide.
 
-If browser does not open automatically, open:
-
-```text
-http://localhost:5173
-```
+If browser does not open automatically, open `http://localhost:5173`.
 
 <a id="further-details"></a>
 
