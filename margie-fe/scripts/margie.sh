@@ -447,7 +447,21 @@ if ! ssh -S "$SOCKET" "$HPC_HOST" "
     cd '$BACKEND_DIR' 2>/dev/null || { echo '  BACKEND_DIR not accessible on the HPC: $BACKEND_DIR' >&2; exit 3; }
     [ -f pyproject.toml ] || { echo '  No pyproject.toml in $BACKEND_DIR -- point BACKEND_DIR at the bioinformatics-tools folder itself.' >&2; exit 4; }
     export PATH=\"\$HOME/.local/bin:\$HOME/.cargo/bin:\$PATH\"
-    command -v uv >/dev/null 2>&1 || { echo '  uv is not installed on the HPC (or not on PATH).' >&2; exit 5; }
+    if ! command -v uv >/dev/null 2>&1; then
+        echo '  uv is not installed on the HPC (or not on PATH). Trying to install it for this user...'
+        if command -v python3 >/dev/null 2>&1; then
+            PYTHON_BOOT=python3
+        elif command -v python >/dev/null 2>&1; then
+            PYTHON_BOOT=python
+        else
+            PYTHON_BOOT=''
+        fi
+        if [ -n "\$PYTHON_BOOT" ]; then
+            "\$PYTHON_BOOT" -m pip install --user --upgrade uv || true
+        fi
+        hash -r 2>/dev/null || true
+    fi
+    command -v uv >/dev/null 2>&1 || { echo '  uv is still not available. Install uv on the HPC (or allow pip --user install) and re-run.' >&2; exit 5; }
     uv sync || { echo '  uv sync failed (see above).' >&2; exit 6; }
     if [ ! -f .env ]; then
         sk=\$(.venv/bin/python -c 'import secrets; print(secrets.token_urlsafe(32))')
