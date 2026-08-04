@@ -154,6 +154,7 @@ MISSING_OPT=""
 PKGS=""
 NEED_NODE="no"
 WARNINGS=""
+OPTIONAL_NOTES=""
 
 want() {   # want <tool> <required|optional> <why>
     local tool="$1" kind="$2" why="$3" pkg
@@ -165,11 +166,16 @@ want() {   # want <tool> <required|optional> <why>
     if [ "$kind" = required ]; then
         report "$tool" "MISSING" "$why"
         MISSING_REQ="$MISSING_REQ $tool"
+        [ -n "$pkg" ] && PKGS="$PKGS $pkg"
     else
         report "$tool" "missing" "$why (optional)"
         MISSING_OPT="$MISSING_OPT $tool"
+        case "$tool" in
+            wslview)
+                OPTIONAL_NOTES="$OPTIONAL_NOTES\n  Optional recommendation: install wslu for browser opening from WSL:\n    sudo apt install -y wslu"
+                ;;
+        esac
     fi
-    [ -n "$pkg" ] && PKGS="$PKGS $pkg"
 }
 
 section "MARGIE — what this computer needs"
@@ -228,6 +234,12 @@ else
     row "verdict" "everything required is already here"
 fi
 [ -n "$MISSING_OPT" ] && row "also missing" "${MISSING_OPT# } (optional)"
+
+if [ -n "$OPTIONAL_NOTES" ]; then
+    section "Optional recommendations"
+    # shellcheck disable=SC2059
+    printf "$OPTIONAL_NOTES\n"
+fi
 
 if [ -n "$WARNINGS" ]; then
     section "Worth fixing"
