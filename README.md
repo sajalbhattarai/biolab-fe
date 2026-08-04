@@ -83,6 +83,9 @@ After first login, open Profile in the GUI and review workflow paths:
 
 - Shared pipeline paths such as `sif_path`, `db_root`, fingerprint database, operon database, genome pool, historical scoring, final tables, and sqlite snapshot paths are prefilled with shared depot defaults.
 - Set `input_path` and `output_path` to your own scratch or working directories.
+- If you want to inspect or edit the live config file directly, open the **File Explorer** page in the GUI, go to `~/.config/bioinformatics-tools/`, and edit `config.yaml` there.
+- The same config also contains per-tool resource settings such as threads, memory, runtime, and partition overrides.
+- GTDB-Tk should remain on the `highmem` partition because it loads a very large reference database into memory.
 
 If the backend folder does not exist yet on the HPC, MARGIE automatically clones `bioinformatics-tools` into the `BACKEND_DIR` path you provide.
 
@@ -130,6 +133,9 @@ After first login, open Profile in the GUI and review workflow paths:
 
 - Shared pipeline paths such as `sif_path`, `db_root`, fingerprint database, operon database, genome pool, historical scoring, final tables, and sqlite snapshot paths are prefilled with shared depot defaults.
 - Set `input_path` and `output_path` to your own scratch or working directories.
+- If you want to inspect or edit the live config file directly, open the **File Explorer** page in the GUI, go to `~/.config/bioinformatics-tools/`, and edit `config.yaml` there.
+- The same config also contains per-tool resource settings such as threads, memory, runtime, and partition overrides.
+- GTDB-Tk should remain on the `highmem` partition because it loads a very large reference database into memory.
 
 If the backend folder does not exist yet on the HPC, MARGIE automatically clones `bioinformatics-tools` into the `BACKEND_DIR` path you provide.
 
@@ -193,6 +199,9 @@ After first login, open Profile in the GUI and review workflow paths:
 
 - Shared pipeline paths such as `sif_path`, `db_root`, fingerprint database, operon database, genome pool, historical scoring, final tables, and sqlite snapshot paths are prefilled with shared depot defaults.
 - Set `input_path` and `output_path` to your own scratch or working directories.
+- If you want to inspect or edit the live config file directly, open the **File Explorer** page in the GUI, go to `~/.config/bioinformatics-tools/`, and edit `config.yaml` there.
+- The same config also contains per-tool resource settings such as threads, memory, runtime, and partition overrides.
+- GTDB-Tk should remain on the `highmem` partition because it loads a very large reference database into memory.
 
 If the backend folder does not exist yet on the HPC, MARGIE automatically clones `bioinformatics-tools` into the `BACKEND_DIR` path you provide.
 
@@ -241,4 +250,12 @@ Use the exact version you ran by checking repository Releases, and include that 
 Please also cite the individual tools and databases you use in the MARGIE pipeline, in accordance with their licensing and referencing requirements. The licensing gates during MARGIE runs provide the relevant licensing details, but you should still cross-check and confirm the requirements before publication.
 
 For machine-readable repository metadata, see [CITATION.cff](CITATION.cff).
+
+### Acknowledgements
+
+We gratefully acknowledge Dane Deemer ([wintermutant](https://github.com/wintermutant)) for the design and development of the backend engine and orchestration platform on which the MARGIE(SB) workflow was built.
+
+We thank Purdue RCAC for the research computing environment that supports this work.
+
+We also thank the developers and maintainers of the upstream tools, databases, and scientific software integrated throughout the pipeline. Their work makes ambitious, reproducible computational biology possible and continues to expand what is exciting to pursue in modern science.
 
