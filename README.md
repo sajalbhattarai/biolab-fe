@@ -251,11 +251,14 @@ Please also cite the individual tools and databases you use in the MARGIE pipeli
 
 For machine-readable repository metadata, see [CITATION.cff](CITATION.cff).
 
-### Acknowledgements
+## Acknowledgements
 
-We gratefully acknowledge Dane Deemer ([wintermutant](https://github.com/wintermutant)) for the design and development of the backend engine and the GUI orchestration platform on which the MARGIE(SB) workflow was built and executed.
+I (Sajal) gratefully acknowledge Dane Deemer ([wintermutant](https://github.com/wintermutant)) for his mentoring, and the design and development of the engine and GUI orchestration platform on which the MARGIE(SB) workflow was built. 
 
-We thank Purdue RCAC for the research computing environment that supports this work.
+Special thanks goes to Dr. Stephen R Lindemann for his vision and support throughout this development.
+I also thank members of Diet-Microbiome-Interactions Laboratory for their feedbacks and intellectual inputs during this development.
 
-We also thank the developers and maintainers of the upstream tools, databases, and scientific software integrated throughout the pipeline. Their work makes ambitious, reproducible computational biology possible and continues to expand what is exciting to pursue in modern science.
+We thank Purdue RCAC for providing the research computing environment that supports this work.
+
+We also thank the developers and maintainers of the upstream tools, databases, and scientific software used throughout the pipeline. Their contributions make reproducible computational biology more powerful, more accessible, and more exciting to do.
 
