@@ -112,7 +112,6 @@ pkg_for() {
         curl:*)             echo curl ;;
         rsync:*)            echo rsync ;;
         lsof:*)             echo lsof ;;
-        wslview:apt)        echo wslu ;;
         *)                  echo "" ;;
     esac
 }
@@ -171,9 +170,6 @@ want() {   # want <tool> <required|optional> <why>
         report "$tool" "missing" "$why (optional)"
         MISSING_OPT="$MISSING_OPT $tool"
         case "$tool" in
-            wslview)
-                OPTIONAL_NOTES="$OPTIONAL_NOTES\n  Optional recommendation: install wslu for browser opening from WSL:\n    sudo apt install -y wslu"
-                ;;
         esac
     fi
 }
@@ -211,7 +207,6 @@ want ssh    required "the private connection to your HPC"
 want curl   required "checks the backend is really answering"
 want rsync  optional "only for: margie --sync"
 want lsof   optional "frees a port left behind by a previous run"
-[ "$IS_WSL" = "yes" ] && want wslview optional "opens the app in your Windows browser"
 
 # ---------------------------------------------------------------------------
 # Things that are not missing packages, but will still ruin the day
