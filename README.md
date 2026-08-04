@@ -253,7 +253,7 @@ For machine-readable repository metadata, see [CITATION.cff](CITATION.cff).
 
 ### Acknowledgements
 
-We gratefully acknowledge Dane Deemer ([wintermutant](https://github.com/wintermutant)) for the design and development of the backend engine and orchestration platform on which the MARGIE(SB) workflow was built.
+We gratefully acknowledge Dane Deemer ([wintermutant](https://github.com/wintermutant)) for the design and development of the backend engine and the GUI orchestration platform on which the MARGIE(SB) workflow was built and executed.
 
 We thank Purdue RCAC for the research computing environment that supports this work.
 
