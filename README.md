@@ -48,6 +48,13 @@ If Homebrew is missing, install it first:
 brew install node git curl
 ```
 
+If you do not want Homebrew, install from official sources:
+
+- Node.js: https://nodejs.org/
+- Git: https://git-scm.com/downloads/mac
+- curl (already included with macOS): https://curl.se/
+- OpenSSH (already included with macOS): https://www.openssh.com/
+
 3. Verify tools
 
 ```bash
@@ -145,6 +152,11 @@ curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt install -y nodejs
 ```
 
+Official package references:
+
+- Ubuntu packages (apt): https://packages.ubuntu.com/
+- NodeSource setup script: https://github.com/nodesource/distributions
+
 5. Verify tools inside Ubuntu
 
 ```bash
@@ -181,6 +193,20 @@ http://localhost:5173
 <a id="further-details"></a>
 
 ## Further details
+
+### Installation sources and citations
+
+The setup steps above rely on these original projects and package sources:
+
+- Windows Subsystem for Linux (Microsoft): https://learn.microsoft.com/windows/wsl/install
+- Ubuntu (Canonical): https://ubuntu.com/wsl
+- Homebrew: https://brew.sh/
+- Node.js: https://nodejs.org/
+- NodeSource distributions: https://github.com/nodesource/distributions
+- Git: https://git-scm.com/
+- OpenSSH: https://www.openssh.com/
+- curl: https://curl.se/
+- Debian/Ubuntu package index: https://packages.ubuntu.com/
 
 ### AI usage in the project
 
