@@ -115,6 +115,20 @@ open_url() {
     if is_wsl; then
         command -v wslview     >/dev/null 2>&1 && wslview "$url"     >/dev/null 2>&1 && return 0
         command -v explorer.exe >/dev/null 2>&1 && { explorer.exe "$url" >/dev/null 2>&1; return 0; }
+        # WSL can have interop switched on while appendWindowsPath=false keeps
+        # the Windows PATH out of Linux -- explorer.exe is then unreachable by
+        # name even though Windows is perfectly able to open the page. Its
+        # install location is fixed, so reach it directly before giving up.
+        if [ -x /mnt/c/Windows/explorer.exe ]; then
+            /mnt/c/Windows/explorer.exe "$url" >/dev/null 2>&1
+            return 0
+        fi
+        if [ -x /mnt/c/Windows/System32/cmd.exe ]; then
+            # The empty "" is cmd's window title, not a stray argument: without
+            # it, start treats the URL as the title and opens nothing.
+            /mnt/c/Windows/System32/cmd.exe /c start "" "$url" >/dev/null 2>&1
+            return 0
+        fi
     fi
     command -v open     >/dev/null 2>&1 && open "$url"     >/dev/null 2>&1 && return 0
     command -v xdg-open >/dev/null 2>&1 && xdg-open "$url" >/dev/null 2>&1 && return 0
