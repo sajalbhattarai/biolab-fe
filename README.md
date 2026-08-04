@@ -79,6 +79,11 @@ margie
 - HPC address (for example: cluster.university.edu)
 - BACKEND_DIR path (press Enter to accept default)
 
+After first login, open Profile in the GUI and review workflow paths:
+
+- Shared pipeline paths such as `sif_path`, `db_root`, fingerprint database, operon database, genome pool, historical scoring, final tables, and sqlite snapshot paths are prefilled with shared depot defaults.
+- Set `input_path` and `output_path` to your own scratch or working directories.
+
 If the backend folder does not exist yet on the HPC, MARGIE automatically clones `bioinformatics-tools` into the `BACKEND_DIR` path you provide.
 
 <a id="run-linux"></a>
@@ -120,6 +125,11 @@ margie
 - HPC username (for example: abc)
 - HPC address (for example: cluster.university.edu)
 - BACKEND_DIR path (press Enter to accept default)
+
+After first login, open Profile in the GUI and review workflow paths:
+
+- Shared pipeline paths such as `sif_path`, `db_root`, fingerprint database, operon database, genome pool, historical scoring, final tables, and sqlite snapshot paths are prefilled with shared depot defaults.
+- Set `input_path` and `output_path` to your own scratch or working directories.
 
 If the backend folder does not exist yet on the HPC, MARGIE automatically clones `bioinformatics-tools` into the `BACKEND_DIR` path you provide.
 
@@ -178,6 +188,11 @@ margie
 - HPC username (for example: abc)
 - HPC address (for example: cluster.university.edu)
 - BACKEND_DIR path (press Enter to accept default)
+
+After first login, open Profile in the GUI and review workflow paths:
+
+- Shared pipeline paths such as `sif_path`, `db_root`, fingerprint database, operon database, genome pool, historical scoring, final tables, and sqlite snapshot paths are prefilled with shared depot defaults.
+- Set `input_path` and `output_path` to your own scratch or working directories.
 
 If the backend folder does not exist yet on the HPC, MARGIE automatically clones `bioinformatics-tools` into the `BACKEND_DIR` path you provide.
 

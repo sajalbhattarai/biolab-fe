@@ -928,7 +928,7 @@
 							Edit per-workflow roots and defaults in one place. This section is the source of truth for Analyze defaults.
 						</p>
 						<p class="text-xs text-surface-600 dark:text-surface-400">
-							Workflow defaults and paths for <span class="font-semibold">{selectedWorkflowLabel}</span> are shown below.
+							Workflow defaults and paths for <span class="font-semibold">{selectedWorkflowLabel}</span> are shown below. Shared pipeline stores are prefilled; set input/output to your own scratch or working directories.
 						</p>
 						<div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
 							<div>
@@ -957,7 +957,7 @@
 							<div class="space-y-5">
 								<div class="rounded-xl border border-surface-300/70 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 p-3">
 									<h4 class="text-sm font-semibold uppercase tracking-wide text-surface-900 dark:text-surface-100">Required for Run</h4>
-									<p class="mt-1 text-xs text-surface-600 dark:text-surface-400">Set these first. These are the core workflow roots plus required shared stores needed for normal execution.</p>
+									<p class="mt-1 text-xs text-surface-600 dark:text-surface-400">Set these first. Shared pipeline stores already have depot defaults. You usually only need to choose your own input and output directories.</p>
 									<div class="mt-2">
 										{#each selectedWorkflowRequiredPathParams as param}
 											{@const parts = param.param.split('.')}
