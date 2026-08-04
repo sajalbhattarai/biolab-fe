@@ -29,23 +29,35 @@ For backend pipeline, CLI, API, and backend runtime/config details, use **[bioin
 
 <a id="run-mac"></a>
 
-## HOW TP RUN --MAC USERS
+## HOW TO RUN --MAC USERS
 
-Requirements:
+1. Open Terminal
 
-- HPC account with SSH access
-- Node.js 20.19+ (or 22.12+ or 24+)
-- Git
-- SSH client
-- curl
+2. Install required tools
 
-Install tools (Homebrew):
+If you already have Homebrew:
 
 ```bash
 brew install node git curl
 ```
 
-Run:
+If Homebrew is missing, install it first:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+brew install node git curl
+```
+
+3. Verify tools
+
+```bash
+node --version
+git --version
+ssh -V
+curl --version
+```
+
+4. Clone and run MARGIE
 
 ```bash
 git clone https://github.com/sajalbhattarai/biolab-fe.git
@@ -54,22 +66,23 @@ cd biolab-fe
 ./setup.sh
 margie
 ```
+
+5. During setup, enter your HPC login details when prompted:
+
+- HPC username (for example: abc)
+- HPC address (for example: cluster.university.edu)
+- BACKEND_DIR path (press Enter to accept default)
 
 If the backend folder does not exist yet on the HPC, MARGIE automatically clones `bioinformatics-tools` into the `BACKEND_DIR` path you provide.
 
 <a id="run-linux"></a>
 
-## HOW TP RUN --LINUX USERS
+## HOW TO RUN --LINUX USERS
 
-Requirements:
+1. Open a terminal on your Linux machine
 
-- HPC account with SSH access
-- Node.js 20.19+ (or 22.12+ or 24+)
-- Git
-- SSH client
-- curl
+2. Install required tools
 
-Install tools (Ubuntu/Debian):
 
 ```bash
 sudo apt update
@@ -78,7 +91,16 @@ curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt install -y nodejs
 ```
 
-Run:
+3. Verify tools
+
+```bash
+node --version
+git --version
+ssh -V
+curl --version
+```
+
+4. Clone and run MARGIE
 
 ```bash
 git clone https://github.com/sajalbhattarai/biolab-fe.git
@@ -87,27 +109,34 @@ cd biolab-fe
 ./setup.sh
 margie
 ```
+
+5. During setup, enter your HPC login details when prompted:
+
+- HPC username (for example: abc)
+- HPC address (for example: cluster.university.edu)
+- BACKEND_DIR path (press Enter to accept default)
 
 If the backend folder does not exist yet on the HPC, MARGIE automatically clones `bioinformatics-tools` into the `BACKEND_DIR` path you provide.
 
 <a id="run-windows"></a>
 
-## HOW TP RUN --WINDOWS USERS
+## HOW TO RUN --WINDOWS USERS
 
-Requirements:
+1. Open PowerShell as Administrator and install WSL + Ubuntu
 
-- WSL 2 with Ubuntu
-- HPC account with SSH access
-- Node.js 20.19+ (or 22.12+ or 24+) inside WSL
-- Git, SSH client, curl inside WSL
-
-Install WSL (PowerShell as Administrator):
 
 ```powershell
 wsl --install -d Ubuntu
 ```
 
-After restart, open Ubuntu and install tools:
+2. Restart Windows if prompted
+
+3. Open Ubuntu
+
+- Start Menu -> search "Ubuntu" -> open it
+- Complete first-run Linux username/password setup
+
+4. Install required tools inside Ubuntu
 
 ```bash
 sudo apt update
@@ -116,7 +145,16 @@ curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt install -y nodejs
 ```
 
-Run in Ubuntu:
+5. Verify tools inside Ubuntu
+
+```bash
+node --version
+git --version
+ssh -V
+curl --version
+```
+
+6. Clone and run MARGIE inside Ubuntu
 
 ```bash
 git clone https://github.com/sajalbhattarai/biolab-fe.git
@@ -125,6 +163,12 @@ cd biolab-fe
 ./setup.sh
 margie
 ```
+
+7. During setup, enter your HPC login details when prompted:
+
+- HPC username (for example: abc)
+- HPC address (for example: cluster.university.edu)
+- BACKEND_DIR path (press Enter to accept default)
 
 If the backend folder does not exist yet on the HPC, MARGIE automatically clones `bioinformatics-tools` into the `BACKEND_DIR` path you provide.
 
