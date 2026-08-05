@@ -449,17 +449,30 @@ if ! ssh -S "$SOCKET" "$HPC_HOST" "
     export PATH=\"\$HOME/.local/bin:\$HOME/.cargo/bin:\$PATH\"
     if ! command -v uv >/dev/null 2>&1; then
         echo '  uv is not installed on the HPC (or not on PATH). Trying to install it for this user...'
-        if command -v python3 >/dev/null 2>&1; then
-            PYTHON_BOOT=python3
-        elif command -v python >/dev/null 2>&1; then
-            PYTHON_BOOT=python
-        else
-            PYTHON_BOOT=''
-        fi
-        if [ -n "\$PYTHON_BOOT" ]; then
-            "\$PYTHON_BOOT" -m pip install --user --upgrade uv || true
+        # Preferred: the official standalone installer -- a static binary that
+        # needs neither Python nor root, so it works even on a Python-less HPC.
+        # It drops uv into ~/.local/bin, already on PATH from the export above.
+        if command -v curl >/dev/null 2>&1; then
+            curl -LsSf https://astral.sh/uv/install.sh | sh || true
+        elif command -v wget >/dev/null 2>&1; then
+            wget -qO- https://astral.sh/uv/install.sh | sh || true
         fi
         hash -r 2>/dev/null || true
+        # Fallback: pip --user, for a locked-down HPC with no outbound curl/wget
+        # but a working Python and package index.
+        if ! command -v uv >/dev/null 2>&1; then
+            if command -v python3 >/dev/null 2>&1; then
+                PYTHON_BOOT=python3
+            elif command -v python >/dev/null 2>&1; then
+                PYTHON_BOOT=python
+            else
+                PYTHON_BOOT=''
+            fi
+            if [ -n "\$PYTHON_BOOT" ]; then
+                "\$PYTHON_BOOT" -m pip install --user --upgrade uv || true
+            fi
+            hash -r 2>/dev/null || true
+        fi
     fi
     command -v uv >/dev/null 2>&1 || { echo '  uv is still not available. Install uv on the HPC (or allow pip --user install) and re-run.' >&2; exit 5; }
     uv sync || { echo '  uv sync failed (see above).' >&2; exit 6; }
