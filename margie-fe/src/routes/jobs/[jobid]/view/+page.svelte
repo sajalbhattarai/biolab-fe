@@ -16,6 +16,11 @@
 	let filePath = $derived($page.url.searchParams.get('path') ?? '');
 	let fileName = $derived(filePath.split('/').pop() ?? filePath);
 	let isImageFile = $derived(/\.(png|jpe?g|gif|webp|svg)$/i.test(fileName));
+	let isTabularFile = $derived(/\.(tsv|csv)$/i.test(fileName));
+	// Anything that is neither an image nor a clean delimited table is shown in
+	// the themed text viewer: .txt/.log/.json/.yaml/.gff/.faa/.fna/.err/... and
+	// unknown extensions alike. A binary sniff downgrades to a download prompt.
+	let viewMode = $derived(isImageFile ? 'image' : isTabularFile ? 'table' : 'text');
 
 	let imageUrl = $state('');
 	let imageError = $state('');
@@ -41,6 +46,62 @@
 		} finally {
 			loading = false;
 		}
+	}
+
+	// --- Plain-text viewer -------------------------------------------------
+	// Renders any non-image, non-table file in a dark, high-contrast code panel
+	// with line numbers and light per-line colouring. Content is fetched as raw
+	// bytes so a NUL-byte sniff can catch binaries before we try to decode them.
+	const TEXT_LINE_CAP = 5000; // keep the DOM (and the tab) responsive
+	let textLines = $state<string[]>([]);
+	let textError = $state('');
+	let looksBinary = $state(false);
+	let textTruncated = $state(false);
+	let wrapText = $state(false);
+
+	async function loadText() {
+		const path = filePath;
+		if (!path) { error = 'No file specified'; loading = false; return; }
+		loading = true;
+		error = '';
+		textError = '';
+		looksBinary = false;
+		textTruncated = false;
+		try {
+			const apiUrl = getApiUrl();
+			const params = new URLSearchParams({ path, format: 'raw' });
+			const res = await fetch(`${apiUrl}/v1/ssh/download_file/${jobId}?${params}`, { headers: authHeaders() });
+			if (res.status === 401) { handle401(); return; }
+			if (!res.ok) throw new Error('Failed to load file');
+			const bytes = new Uint8Array(await res.arrayBuffer());
+			// A NUL byte in the first 8 KB is a reliable "this is binary" signal.
+			if (bytes.subarray(0, 8192).includes(0)) { looksBinary = true; return; }
+			const decoded = new TextDecoder('utf-8').decode(bytes).replace(/\r\n?/g, '\n');
+			const lines = decoded.split('\n');
+			if (lines.length > TEXT_LINE_CAP) {
+				textTruncated = true;
+				textLines = lines.slice(0, TEXT_LINE_CAP);
+			} else {
+				textLines = lines;
+			}
+		} catch (e) {
+			textError = e instanceof Error ? e.message : 'Failed to load file';
+		} finally {
+			loading = false;
+		}
+	}
+
+	// Cheap, safe per-line tinting -- no HTML is injected, only a class is chosen,
+	// so Svelte still escapes every character of the line.
+	function lineClass(line: string): string {
+		const t = line.trimStart();
+		if (!t) return '';
+		if (t.startsWith('>')) return 'text-cyan-300 font-semibold';        // FASTA header
+		if (/^(#|;|\/\/)/.test(t)) return 'text-emerald-300/80';            // comment
+		if (/\b(error|fail(ed|ure)?|traceback|exception|fatal)\b/i.test(line)) return 'text-red-300';
+		if (/\b(warn(ing)?|deprecat)\b/i.test(line)) return 'text-amber-300';
+		if (/\b(info|notice|success|done|complete[d]?)\b/i.test(line)) return 'text-sky-300';
+		return '';
 	}
 
 	const PAGE_SIZE_OPTIONS = [50, 100, 250, 500];
@@ -145,10 +206,12 @@
 	}
 
 	$effect(() => {
-		if (isImageFile) {
+		if (viewMode === 'image') {
 			loadImage();
-		} else {
+		} else if (viewMode === 'table') {
 			fetchPage();
+		} else {
+			loadText();
 		}
 	});
 
@@ -214,14 +277,22 @@
 	<div class="mb-6 flex flex-wrap items-start justify-between gap-4">
 		<div>
 			<h1 class="text-2xl font-bold text-primary-500 font-mono break-all">{fileName}</h1>
-			{#if isImageFile}
+			{#if viewMode === 'image'}
 				<p class="text-sm text-surface-500 mt-1">image</p>
+			{:else if viewMode === 'text'}
+				<p class="text-sm text-surface-500 mt-1">text{textTruncated ? ' (truncated)' : ''}</p>
 			{:else}
 				<p class="text-sm text-surface-500 mt-1">{totalRows.toLocaleString()} rows</p>
 			{/if}
 		</div>
 		<div class="flex items-center gap-2">
-			{#if !isImageFile}
+			{#if viewMode === 'text'}
+				<button type="button" onclick={() => wrapText = !wrapText}
+					class="btn variant-ghost-primary btn-sm" title="Toggle line wrapping">
+					{wrapText ? 'No wrap' : 'Wrap'}
+				</button>
+			{/if}
+			{#if viewMode === 'table'}
 				<label for="download-format" class="text-sm text-surface-500">Format</label>
 				<select
 					id="download-format"
@@ -247,7 +318,7 @@
 		<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">{downloadError}</div>
 	{/if}
 
-	{#if !isImageFile}
+	{#if viewMode === 'table'}
 	<div class="card p-4 bg-surface-100 dark:bg-surface-800 mb-4 flex flex-wrap items-center justify-between gap-3">
 		<div class="flex items-center gap-2">
 			<button type="button" onclick={prevPage} disabled={currentPage <= 1}
@@ -277,7 +348,7 @@
 			<div class="p-12 text-center text-surface-500">
 				<p class="text-lg">Loading...</p>
 			</div>
-		{:else if isImageFile}
+		{:else if viewMode === 'image'}
 			{#if imageError}
 				<div class="p-12 text-center text-red-500">
 					<p class="text-lg">{imageError}</p>
@@ -285,6 +356,32 @@
 			{:else}
 				<div class="p-4 flex justify-center bg-surface-50 dark:bg-surface-900 overflow-x-auto">
 					<img src={imageUrl} alt={fileName} class="max-w-full h-auto" />
+				</div>
+			{/if}
+		{:else if viewMode === 'text'}
+			{#if textError}
+				<div class="p-12 text-center text-red-500">
+					<p class="text-lg">{textError}</p>
+				</div>
+			{:else if looksBinary}
+				<div class="p-12 text-center text-surface-500 space-y-3">
+					<p class="text-lg">This looks like a binary file and can&rsquo;t be shown as text.</p>
+					<button type="button" onclick={downloadFile} disabled={downloading}
+						class="btn variant-filled-primary btn-sm">Download instead</button>
+				</div>
+			{:else}
+				{#if textTruncated}
+					<div class="px-4 py-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 border-b border-amber-500/20">
+						Showing the first {TEXT_LINE_CAP.toLocaleString()} lines &mdash; download the file to see the rest.
+					</div>
+				{/if}
+				<div class="bg-[#0d1117] text-[#e6edf3] font-mono text-[13px] leading-relaxed overflow-x-auto py-2">
+					{#each textLines as line, i}
+						<div class="flex hover:bg-white/5">
+							<span class="select-none shrink-0 text-right px-3 text-[#6e7681] border-r border-[#21262d] bg-[#0d1117] sticky left-0" style="min-width:3.5rem">{i + 1}</span>
+							<span class="pl-4 pr-4 {wrapText ? 'whitespace-pre-wrap break-words' : 'whitespace-pre'} {lineClass(line)}">{line === '' ? '\u00A0' : line}</span>
+						</div>
+					{/each}
 				</div>
 			{/if}
 		{:else}

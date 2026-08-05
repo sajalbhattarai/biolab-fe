@@ -138,6 +138,7 @@
 	let showSlurmJobs = $state(true);
 	let showOutputFiles = $state(true);
 	let showFileGuide = $state(false);
+	let expandFileList = $state(false);  // taller file-list panel on demand
 	let expandPipLogs = $state(false);
 	let logGroups = $derived(job?.logs ? processLogs(job.logs) : []);
 
@@ -336,14 +337,6 @@
 	function isTabular(name: string): boolean {
 		const lower = name.toLowerCase();
 		return lower.endsWith('.tsv') || lower.endsWith('.csv');
-	}
-
-	function isImage(name: string): boolean {
-		return /\.(png|jpe?g|gif|webp|svg)$/.test(name.toLowerCase());
-	}
-
-	function isViewable(name: string): boolean {
-		return isTabular(name) || isImage(name);
 	}
 
 	// The self-contained interactive genome/operon map written at the organism
@@ -902,7 +895,15 @@
 				{#if filesLoading && outputFiles.length === 0}
 					<p class="text-surface-500">Loading files...</p>
 				{:else if outputFiles.length > 0}
-					<div class="space-y-1 overflow-y-auto h-60 min-h-[120px] max-h-[80vh] rounded border border-surface-300 dark:border-surface-600 p-2 pr-3">
+					<div class="flex justify-end mb-1">
+						<button
+							type="button"
+							onclick={() => expandFileList = !expandFileList}
+							class="text-xs text-primary-500 hover:text-primary-400 px-2 py-1 rounded border border-primary-500/30 hover:border-primary-400 transition-colors"
+							title="Make the file list taller or shorter"
+						>{expandFileList ? 'Shrink list \u25B2' : 'Expand list \u25BC'}</button>
+					</div>
+					<div class="space-y-1 overflow-y-auto resize-y {expandFileList ? 'h-[70vh]' : 'h-60'} min-h-[120px] max-h-[85vh] rounded border border-surface-300 dark:border-surface-600 p-2 pr-3">
 						{#each fileRows as { entry, path, depth } (path)}
 							{#if entry.type === 'directory'}
 								<button
@@ -939,7 +940,7 @@
 												title="Open the interactive genome / operon map"
 											>Open map</a>
 										{/if}
-										{#if isViewable(entry.name)}
+										{#if !isGenomeViewer(entry.name)}
 											<button
 												type="button"
 												onclick={() => openViewer({ ...entry, name: path })}
