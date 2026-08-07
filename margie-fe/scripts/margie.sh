@@ -291,28 +291,32 @@ ADVERT=".local/share/bsp/api-endpoint.json"
 prev="$(ssh -o BatchMode=yes -o ConnectTimeout=15 "$HPC_HOST" \
         "cat \$HOME/$ADVERT 2>/dev/null" 2>/dev/null)"
 
-if [ -z "$prev" ]; then
-    row "previous" "none recorded"
-else
-    prev_host="$(printf '%s' "$prev" | sed -n 's/.*"host": *"\([^"]*\)".*/\1/p')"
-    prev_pid="$(printf '%s' "$prev" | sed -n 's/.*"pid": *\([0-9]*\).*/\1/p')"
-    if [ -n "$prev_host" ] && [ -n "$prev_pid" ]; then
-        row "found" "pid $prev_pid on ${prev_host%%.*}"
-        # Reach that specific node. ssh to the cluster address would round-robin
-        # and probably miss it, so the recorded hostname is used directly.
-        ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=no \
-            "${HPC_HOST%%@*}@$prev_host" "
-                kill $prev_pid 2>/dev/null
-                sleep 2
-                kill -0 $prev_pid 2>/dev/null && kill -9 $prev_pid 2>/dev/null
-                # Sweep this node for any other stray dane-api of ours, then drop
-                # the advert so a failed kill cannot leave a phantom entry.
-                pkill -u \$USER -f 'bin/dane-api' 2>/dev/null
-                rm -f \$HOME/$ADVERT
-            " >/dev/null 2>&1 && row "terminated" "yes" || row "terminated" "could not reach ${prev_host%%.*}"
+if [ "$MODE" = 2 ]; then
+    if [ -z "$prev" ]; then
+        row "previous" "none recorded"
     else
-        row "previous" "advert unreadable — ignoring"
+        prev_host="$(printf '%s' "$prev" | sed -n 's/.*"host": *"\([^"]*\)".*/\1/p')"
+        prev_pid="$(printf '%s' "$prev" | sed -n 's/.*"pid": *\([0-9]*\).*/\1/p')"
+        if [ -n "$prev_host" ] && [ -n "$prev_pid" ]; then
+            row "found" "pid $prev_pid on ${prev_host%%.*}"
+            # Reach that specific node. ssh to the cluster address would round-robin
+            # and probably miss it, so the recorded hostname is used directly.
+            ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=no \
+                "${HPC_HOST%%@*}@$prev_host" "
+                    kill $prev_pid 2>/dev/null
+                    sleep 2
+                    kill -0 $prev_pid 2>/dev/null && kill -9 $prev_pid 2>/dev/null
+                    # Sweep this node for any other stray dane-api of ours, then drop
+                    # the advert so a failed kill cannot leave a phantom entry.
+                    pkill -u \$USER -f 'bin/dane-api' 2>/dev/null
+                    rm -f \$HOME/$ADVERT
+                " >/dev/null 2>&1 && row "terminated" "yes" || row "terminated" "could not reach ${prev_host%%.*}"
+        else
+            row "previous" "advert unreadable — ignoring"
+        fi
     fi
+else
+    row "previous" "kept (relaunch mode)"
 fi
 
 # ---------------------------------------------------------------------------
@@ -348,6 +352,7 @@ esac
 
 NODE=""
 TARGET=""
+REUSE_BACKEND="no"
 for cand in $CANDIDATES; do
     rm -f "$SOCKET"
     # -q silences the login banner, which otherwise prints on every probe.
@@ -380,7 +385,10 @@ for cand in $CANDIDATES; do
             NODE="${_n:-$cand}"
             TARGET="$cand"
             row "node" "$NODE"
-            [ "$verdict" = ours ] && row "backend" "already running (yours) — reusing"
+            if [ "$verdict" = ours ]; then
+                row "backend" "already running (yours) — reusing"
+                REUSE_BACKEND="yes"
+            fi
             break
             ;;
         *)
@@ -489,45 +497,49 @@ if ! ssh -S "$SOCKET" "$HPC_HOST" "
     exit 1
 fi
 
-# Belt and braces: clear any dane-api of ours on THIS node before starting.
-# The advert-based kill above only finds processes that recorded themselves, so
-# it misses anything started by an older build -- and a leftover here would stop
-# the new one binding, leaving the tunnel pointed at the stale process.
-ssh -S "$SOCKET" "$HPC_HOST" "pkill -u \$USER -f 'bin/dane-api' 2>/dev/null; sleep 1" >/dev/null 2>&1 || true
+if [ "$REUSE_BACKEND" = "yes" ]; then
+    row "dane-api pid" "reused"
+else
+    # Belt and braces: clear any dane-api of ours on THIS node before starting.
+    # The advert-based kill above only finds processes that recorded themselves, so
+    # it misses anything started by an older build -- and a leftover here would stop
+    # the new one binding, leaving the tunnel pointed at the stale process.
+    ssh -S "$SOCKET" "$HPC_HOST" "pkill -u \$USER -f 'bin/dane-api' 2>/dev/null; sleep 1" >/dev/null 2>&1 || true
 
-BE_PID="$(ssh -S "$SOCKET" "$HPC_HOST" "
-    cd '$BACKEND_DIR' || exit 1
-    export PATH=\"\$HOME/.local/bin:\$HOME/.cargo/bin:\$PATH\"
-    source .venv/bin/activate
-    nohup dane-api > $REMOTE_LOG 2>&1 & echo \$!
-" | tail -1)"
-row "dane-api pid" "$BE_PID"
+    BE_PID="$(ssh -S "$SOCKET" "$HPC_HOST" "
+        cd '$BACKEND_DIR' || exit 1
+        export PATH=\"\$HOME/.local/bin:\$HOME/.cargo/bin:\$PATH\"
+        source .venv/bin/activate
+        nohup dane-api > $REMOTE_LOG 2>&1 & echo \$!
+    " | tail -1)"
+    row "dane-api pid" "$BE_PID"
 
-printf '  waiting for backend'
-backend_ready="no"
-for i in $(seq 1 60); do
-    # Assert it is OUR api, not merely "something answers on 8000". A bare
-    # reachability check is what allowed an unrelated service to be mistaken
-    # for the backend and reported as READY.
-    if ssh -S "$SOCKET" "$HPC_HOST" \
-        "curl -fsS --max-time 5 http://localhost:8000/openapi.json 2>/dev/null | grep -q '/v1/ssh/'"; then
-        printf ' ready\n'
-        backend_ready="yes"
-        break
+    printf '  waiting for backend'
+    backend_ready="no"
+    for i in $(seq 1 60); do
+        # Assert it is OUR api, not merely "something answers on 8000". A bare
+        # reachability check is what allowed an unrelated service to be mistaken
+        # for the backend and reported as READY.
+        if ssh -S "$SOCKET" "$HPC_HOST" \
+            "curl -fsS --max-time 5 http://localhost:8000/openapi.json 2>/dev/null | grep -q '/v1/ssh/'"; then
+            printf ' ready\n'
+            backend_ready="yes"
+            break
+        fi
+        printf '.'
+        sleep 1
+    done
+    if [ "$backend_ready" != "yes" ]; then
+        printf '\n'
+        echo "  dane-api did not start. Last lines of its log:"
+        ssh -S "$SOCKET" "$HPC_HOST" "tail -n 20 $REMOTE_LOG 2>/dev/null" | sed 's/^/    /'
+        echo "  Two common causes:"
+        echo "   * no .env with BSP_SECRET_KEY / BSP_ENCRYPTION_KEY"
+        echo "     (see the backend's README / docs/LOCAL_DEV.md)"
+        echo "   * port 8000 taken on this login node, so uvicorn could not bind."
+        echo "     Check with:  ssh $HPC_HOST 'ss -ltnp | grep :8000'"
+        exit 1
     fi
-    printf '.'
-    sleep 1
-done
-if [ "$backend_ready" != "yes" ]; then
-    printf '\n'
-    echo "  dane-api did not start. Last lines of its log:"
-    ssh -S "$SOCKET" "$HPC_HOST" "tail -n 20 $REMOTE_LOG 2>/dev/null" | sed 's/^/    /'
-    echo "  Two common causes:"
-    echo "   * no .env with BSP_SECRET_KEY / BSP_ENCRYPTION_KEY"
-    echo "     (see the backend's README / docs/LOCAL_DEV.md)"
-    echo "   * port 8000 taken on this login node, so uvicorn could not bind."
-    echo "     Check with:  ssh $HPC_HOST 'ss -ltnp | grep :8000'"
-    exit 1
 fi
 
 # ---------------------------------------------------------------------------
