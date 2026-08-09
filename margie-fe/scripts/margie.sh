@@ -90,8 +90,8 @@ row() {
 # ---------------------------------------------------------------------------
 # Kill whatever is holding a local port.
 #
-# lsof is the macOS answer but is NOT installed on a stock Ubuntu — including
-# the one WSL gives Windows users — so a missing lsof silently stopped stale
+# lsof is the macOS answer but is NOT installed on a stock Ubuntu -- including
+# the one WSL gives Windows users -- so a missing lsof silently stopped stale
 # ports being freed there. Fall through to tools that distribution does ship.
 # ---------------------------------------------------------------------------
 free_port() {
@@ -186,20 +186,19 @@ if is_wsl; then
             ;;
     esac
 fi
-
-# ---------------------------------------------------------------------------
-# What kind of launch?
-#
-# Non-interactive (no tty, or MARGIE_MODE set) defaults to 1, so this stays
-# usable from a script or a CI job without hanging on a read.
 # ---------------------------------------------------------------------------
 MODE="${MARGIE_MODE:-}"
 if [ -z "$MODE" ]; then
     if [ -t 0 ]; then
         echo
-        echo "  1) Relaunch MARGIE          — reuse a healthy backend if one is already up"
-        echo "  2) Clean restart            — close YOUR remote sessions on every login"
-        echo "                                node first, then start everything fresh"
+        echo "  1) Reattach / relaunch (safe)"
+        echo "     - keeps running SLURM jobs untouched"
+        echo "     - does NOT run git pull on HPC backend"
+        echo "     - prefers reusing an already-running backend when possible"
+        echo "  2) Clean restart (destructive)"
+        echo "     - cancels ALL your running/pending SLURM jobs"
+        echo "     - closes YOUR remote API sessions on login nodes"
+        echo "     - runs git pull --ff-only on the HPC backend, then starts fresh"
         echo
         printf "  Choose [1]: "
         read -r MODE || MODE=1
@@ -208,9 +207,21 @@ if [ -z "$MODE" ]; then
     fi
 fi
 case "${MODE:-1}" in
-    2) MODE=2; row "mode" "clean restart (close all my remote sessions first)" ;;
-    *) MODE=1; row "mode" "relaunch" ;;
+    2) MODE=2; row "mode" "clean restart (destructive: cancel jobs + refresh backend)" ;;
+    *) MODE=1; row "mode" "reattach/relaunch (safe: keep jobs running)" ;;
 esac
+
+if [ "$MODE" = 2 ] && [ -t 0 ]; then
+    echo
+    echo "  WARNING: Option 2 will cancel ALL your SLURM jobs and restart backend services."
+    printf "  Type YES to continue [default: no]: "
+    read -r MODE2_CONFIRM || MODE2_CONFIRM=""
+    if [ "$MODE2_CONFIRM" != "YES" ]; then
+        echo "  Option 2 aborted by user. Falling back to option 1 (safe reattach/relaunch)."
+        MODE=1
+        row "mode" "reattach/relaunch (safe: keep jobs running)"
+    fi
+fi
 
 # ---------------------------------------------------------------------------
 # Free local ports left over from a previous run
@@ -264,6 +275,16 @@ section "Backend (on the HPC)"
 # number of login nodes degrades quietly instead of erroring.
 # ---------------------------------------------------------------------------
 if [ "$MODE" = 2 ]; then
+    section "Cancelling my SLURM jobs"
+    jobs_before="$(ssh -o BatchMode=yes -o ConnectTimeout=10 "$HPC_HOST" \
+        "squeue -h -u \\\$USER 2>/dev/null | wc -l" 2>/dev/null || echo '?')"
+    ssh -o BatchMode=yes -o ConnectTimeout=10 "$HPC_HOST" \
+        "scancel -u \\\$USER >/dev/null 2>&1 || true" >/dev/null 2>&1 || true
+    jobs_after="$(ssh -o BatchMode=yes -o ConnectTimeout=10 "$HPC_HOST" \
+        "squeue -h -u \\\$USER 2>/dev/null | wc -l" 2>/dev/null || echo '?')"
+    row "jobs before" "$jobs_before"
+    row "jobs after" "$jobs_after"
+
     section "Closing my remote sessions"
     _user="${HPC_HOST%%@*}"
     _dom="${HPC_HOST##*@}"
@@ -353,6 +374,8 @@ esac
 NODE=""
 TARGET=""
 REUSE_BACKEND="no"
+FIRST_FREE_NODE=""
+FIRST_FREE_TARGET=""
 for cand in $CANDIDATES; do
     rm -f "$SOCKET"
     # -q silences the login banner, which otherwise prints on every probe.
@@ -381,15 +404,21 @@ for cand in $CANDIDATES; do
         fi' 2>/dev/null)"
 
     case "$verdict" in
-        free|ours)
+        ours)
             NODE="${_n:-$cand}"
             TARGET="$cand"
             row "node" "$NODE"
-            if [ "$verdict" = ours ]; then
-                row "backend" "already running (yours) — reusing"
-                REUSE_BACKEND="yes"
-            fi
+            row "backend" "already running (yours) — reusing"
+            REUSE_BACKEND="yes"
             break
+            ;;
+        free)
+            if [ -z "$FIRST_FREE_TARGET" ]; then
+                FIRST_FREE_TARGET="$cand"
+                FIRST_FREE_NODE="${_n:-$cand}"
+            fi
+            row "${_n:-$cand}" "port 8000 free — candidate"
+            ssh -q -S "$SOCKET" -O exit "$cand" 2>/dev/null || true
             ;;
         *)
             row "${_n:-$cand}" "port 8000 taken by another process — next node"
@@ -397,6 +426,17 @@ for cand in $CANDIDATES; do
             ;;
     esac
 done
+
+if [ "$REUSE_BACKEND" != "yes" ] && [ -n "$FIRST_FREE_TARGET" ]; then
+    rm -f "$SOCKET"
+    if ssh -q -M -S "$SOCKET" -o ConnectTimeout=15 -o StrictHostKeyChecking=no \
+            -fN "$FIRST_FREE_TARGET" 2>/dev/null; then
+        NODE="$FIRST_FREE_NODE"
+        TARGET="$FIRST_FREE_TARGET"
+        row "node" "$NODE"
+        row "backend" "starting fresh on free node"
+    fi
+fi
 
 # Everything downstream reuses the master socket, so point HPC_HOST at whichever
 # host we actually connected to.
@@ -454,6 +494,14 @@ if ! ssh -S "$SOCKET" "$HPC_HOST" "
     fi
     cd '$BACKEND_DIR' 2>/dev/null || { echo '  BACKEND_DIR not accessible on the HPC: $BACKEND_DIR' >&2; exit 3; }
     [ -f pyproject.toml ] || { echo '  No pyproject.toml in $BACKEND_DIR -- point BACKEND_DIR at the bioinformatics-tools folder itself.' >&2; exit 4; }
+    if [ "$MODE" = "2" ] && command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        b=\$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+        echo \"  refreshing backend source on branch \$b (git pull --ff-only)\"
+        git fetch --all --prune || { echo '  git fetch failed.' >&2; exit 7; }
+        git pull --ff-only || { echo '  git pull --ff-only failed (non-fast-forward or conflict). Resolve manually, then retry option 2.' >&2; exit 7; }
+    elif [ "$MODE" = "2" ]; then
+        echo '  skipping git pull: backend directory is not a git checkout or git is unavailable.'
+    fi
     export PATH=\"\$HOME/.local/bin:\$HOME/.cargo/bin:\$PATH\"
     if ! command -v uv >/dev/null 2>&1; then
         echo '  uv is not installed on the HPC (or not on PATH). Trying to install it for this user...'

@@ -335,6 +335,21 @@ install_pkgs() {
     esac
 }
 
+section "MARGIE launch modes"
+echo "  When you run margie, you will choose one mode:"
+echo
+echo "  1) Reattach / relaunch (safe)"
+echo "     - keeps your running/pending SLURM jobs untouched"
+echo "     - does not run git pull on the HPC backend checkout"
+echo "     - prefers reusing your already-running backend"
+echo
+echo "  2) Clean restart (destructive)"
+echo "     - cancels ALL your running/pending SLURM jobs"
+echo "     - closes your remote backend sessions on login nodes"
+echo "     - runs git pull --ff-only on the HPC backend checkout"
+echo "     - asks for explicit YES confirmation before proceeding"
+
+
 # Debian and Ubuntu pin `nodejs` to whatever was current when the release froze
 # — 12.22 on Ubuntu 22.04, which cannot run this app. Use the distribution's
 # package when it is new enough, and NodeSource only when it is not.
