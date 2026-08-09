@@ -311,13 +311,16 @@ section "Previous backend"
 ADVERT=".local/share/bsp/api-endpoint.json"
 prev="$(ssh -o BatchMode=yes -o ConnectTimeout=15 "$HPC_HOST" \
         "cat \$HOME/$ADVERT 2>/dev/null" 2>/dev/null)"
+# Parsed in BOTH modes. dane-api writes this advert on startup, so it -- not a
+# walk across every login node -- is how we find our own backend. Probing the
+# recorded host first is what keeps a relaunch to a single connection.
+prev_host="$(printf '%s' "$prev" | sed -n 's/.*"host": *"\([^"]*\)".*/\1/p')"
+prev_pid="$(printf '%s' "$prev" | sed -n 's/.*"pid": *\([0-9]*\).*/\1/p')"
 
 if [ "$MODE" = 2 ]; then
     if [ -z "$prev" ]; then
         row "previous" "none recorded"
     else
-        prev_host="$(printf '%s' "$prev" | sed -n 's/.*"host": *"\([^"]*\)".*/\1/p')"
-        prev_pid="$(printf '%s' "$prev" | sed -n 's/.*"pid": *\([0-9]*\).*/\1/p')"
         if [ -n "$prev_host" ] && [ -n "$prev_pid" ]; then
             row "found" "pid $prev_pid on ${prev_host%%.*}"
             # Reach that specific node. ssh to the cluster address would round-robin
@@ -337,7 +340,11 @@ if [ "$MODE" = 2 ]; then
         fi
     fi
 else
-    row "previous" "kept (relaunch mode)"
+    if [ -n "$prev_host" ]; then
+        row "previous" "recorded on ${prev_host%%.*} — trying it first"
+    else
+        row "previous" "none recorded"
+    fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -374,13 +381,27 @@ esac
 NODE=""
 TARGET=""
 REUSE_BACKEND="no"
-FIRST_FREE_NODE=""
-FIRST_FREE_TARGET=""
+
+# Probe the node the advert names before anything else. Every candidate costs a
+# SEPARATE authentication -- ssh multiplexing only reuses a connection to the
+# SAME host, so on a cluster without key auth each extra node probed is another
+# password/2FA prompt. Walking all eight login nodes to look for a backend the
+# advert could have named outright is what turned one prompt into eight.
+if [ -n "$prev_host" ]; then
+    _me="${HPC_HOST%%@*}"
+    CANDIDATES="$_me@$prev_host $(printf '%s\n' $CANDIDATES | grep -v "@${prev_host}\$" | tr '\n' ' ')"
+fi
+
 for cand in $CANDIDATES; do
     rm -f "$SOCKET"
+    # Name the host BEFORE connecting: ssh prints its own bare "(user@host)
+    # Password:" prompt, and without this line it is impossible to tell which
+    # node a prompt belongs to, or why you are being asked at all.
+    row "connecting" "${cand#*@}"
     # -q silences the login banner, which otherwise prints on every probe.
     if ! ssh -q -M -S "$SOCKET" -o ConnectTimeout=15 -o StrictHostKeyChecking=no \
             -fN "$cand" 2>/dev/null; then
+        row "${cand#*@}" "unreachable — next node"
         continue                                   # node down or not resolvable
     fi
 
@@ -413,12 +434,14 @@ for cand in $CANDIDATES; do
             break
             ;;
         free)
-            if [ -z "$FIRST_FREE_TARGET" ]; then
-                FIRST_FREE_TARGET="$cand"
-                FIRST_FREE_NODE="${_n:-$cand}"
-            fi
-            row "${_n:-$cand}" "port 8000 free — candidate"
-            ssh -q -S "$SOCKET" -O exit "$cand" 2>/dev/null || true
+            # Take it and KEEP this connection. Closing the socket to carry on
+            # looking meant re-authenticating to this same node later anyway --
+            # two prompts for one node, on top of one per node skipped.
+            NODE="${_n:-$cand}"
+            TARGET="$cand"
+            row "node" "$NODE"
+            row "backend" "starting fresh on free node"
+            break
             ;;
         *)
             row "${_n:-$cand}" "port 8000 taken by another process — next node"
@@ -426,17 +449,6 @@ for cand in $CANDIDATES; do
             ;;
     esac
 done
-
-if [ "$REUSE_BACKEND" != "yes" ] && [ -n "$FIRST_FREE_TARGET" ]; then
-    rm -f "$SOCKET"
-    if ssh -q -M -S "$SOCKET" -o ConnectTimeout=15 -o StrictHostKeyChecking=no \
-            -fN "$FIRST_FREE_TARGET" 2>/dev/null; then
-        NODE="$FIRST_FREE_NODE"
-        TARGET="$FIRST_FREE_TARGET"
-        row "node" "$NODE"
-        row "backend" "starting fresh on free node"
-    fi
-fi
 
 # Everything downstream reuses the master socket, so point HPC_HOST at whichever
 # host we actually connected to.
