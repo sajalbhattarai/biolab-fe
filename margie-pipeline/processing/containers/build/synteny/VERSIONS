@@ -1,0 +1,6 @@
+LIFTOFF_VERSION=1.6.3.2
+LIFTOFF_SOURCE=https://pypi.org/project/liftoff/1.6.3.2/
+MINIMAP2_VERSION=2.28
+MINIMAP2_SOURCE=https://github.com/lh3/minimap2/archive/refs/tags/v2.28.tar.gz
+BASE_IMAGE=python:3.11-slim
+PLATFORM=linux/amd64,linux/arm64

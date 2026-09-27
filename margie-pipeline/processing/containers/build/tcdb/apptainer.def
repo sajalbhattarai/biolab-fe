@@ -1,0 +1,58 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# tcdb — apptainer recipe (hand-translated from Dockerfile)
+# DIAMOND blastp against TCDB transporter database. Uses pre-compiled Linux binary.
+# See LICENSE.md for license terms (DIAMOND: GPL-3.0).
+# ──────────────────────────────────────────────────────────────────────────────
+
+Bootstrap: docker
+From: debian:12-slim
+
+%files
+    entrypoint.sh /opt/tcdb/entrypoint.sh
+    scripts      /opt/tcdb/
+    LICENSE.md    /opt/tcdb/LICENSE.md
+    VERSIONS      /opt/tcdb/VERSIONS
+
+%labels
+    org.opencontainers.image.title         tcdb
+    org.opencontainers.image.description   "DIAMOND blastp against TCDB transporter database (pre-built binary)"
+    org.opencontainers.image.source        https://github.com/sajalbhattarai/containers
+    org.opencontainers.image.vendor        margie-annotation
+    org.opencontainers.image.licenses      "GPL-3.0-or-later AND CC-BY-4.0"
+    org.opencontainers.image.version       diamond-2.1.9
+
+%environment
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+
+    DIAMOND_VERSION=2.1.9
+
+    apt-get update && apt-get install -y --no-install-recommends \
+            python3 tini bash ca-certificates wget zlib1g \
+     && rm -rf /var/lib/apt/lists/*
+
+    cd /tmp \
+     && wget -q "https://github.com/bbuchfink/diamond/releases/download/v${DIAMOND_VERSION}/diamond-linux64.tar.gz" \
+     && tar -xzf diamond-linux64.tar.gz \
+     && mv diamond /usr/local/bin/diamond \
+     && chmod +x /usr/local/bin/diamond \
+     && rm -f diamond-linux64.tar.gz
+
+    chmod -R a+rX /opt/tcdb \
+     && find /opt/tcdb -type f \( -name '*.sh' -o -name '*.py' \) -exec chmod a+x {} + \
+     && ln -sf /opt/tcdb/entrypoint.sh /usr/local/bin/run \
+     && mkdir -p /input /output /db
+
+    printf '{\n  "tool": "tcdb",\n  "diamond_version": "%s",\n  "base_image": "debian:12-slim",\n  "build_date": "%s"\n}\n' \
+            "${DIAMOND_VERSION}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            > /etc/pipeline-build.json
+
+%runscript
+    exec /usr/bin/tini -- /usr/local/bin/run "$@"

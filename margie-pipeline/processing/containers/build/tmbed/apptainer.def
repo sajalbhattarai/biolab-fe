@@ -1,0 +1,79 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# tmbed — apptainer recipe (hand-translated from Dockerfile)
+# Deep-learning transmembrane segment + signal peptide predictor.
+# PyTorch CPU wheels + tmbed installed from upstream GitHub at pinned tag.
+# Model weights (ProtT5-XL-U50, ~2.25 GB) are downloaded on first run into /models.
+# See LICENSE.md for license terms.
+# ──────────────────────────────────────────────────────────────────────────────
+
+Bootstrap: docker
+From: python:3.11-slim
+
+%files
+    entrypoint.sh /opt/tmbed/entrypoint.sh
+    scripts      /opt/tmbed/
+    LICENSE.md    /opt/tmbed/LICENSE.md
+    VERSIONS      /opt/tmbed/VERSIONS
+
+%labels
+    org.opencontainers.image.title         tmbed
+    org.opencontainers.image.description   "TMbed transmembrane predictor — PyTorch CPU, pinned upstream tag"
+    org.opencontainers.image.source        https://github.com/sajalbhattarai/containers
+    org.opencontainers.image.vendor        margie-annotation
+    org.opencontainers.image.licenses      Apache-2.0
+    org.opencontainers.image.version       tmbed-1.0.0
+
+%environment
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+    export TRANSFORMERS_CACHE=/models
+    export HF_HOME=/models
+    export TORCH_HOME=/models
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+    export TRANSFORMERS_CACHE=/models
+    export HF_HOME=/models
+    export TORCH_HOME=/models
+
+    TMBED_REF=v1.0.0
+    TORCH_VERSION=2.2.2
+
+    apt-get update && apt-get install -y --no-install-recommends \
+            tini bash ca-certificates git wget \
+     && rm -rf /var/lib/apt/lists/*
+
+    # CPU-only PyTorch (smaller, no CUDA; pinned version)
+    pip install --no-cache-dir \
+            --index-url https://download.pytorch.org/whl/cpu \
+            "torch==${TORCH_VERSION}"
+
+    # TMbed at pinned upstream tag. Upstream v1.0.0 pins torch<2.0.0 (stale upper
+    # bound — tmbed runs fine on torch 2.x), so install with --no-deps and pull in
+    # its actual runtime deps explicitly.
+    pip install --no-cache-dir \
+            "transformers==4.36.2" \
+            "h5py==3.10.0" \
+            "numpy<2" \
+            "sentencepiece" \
+            "tqdm" \
+                 "einops" \
+                 "typer" \
+     && pip install --no-cache-dir --no-deps \
+            "git+https://github.com/BernhoferM/TMbed.git@${TMBED_REF}"
+
+    chmod -R a+rX /opt/tmbed \
+     && find /opt/tmbed -type f \( -name '*.sh' -o -name '*.py' \) -exec chmod a+x {} + \
+     && ln -sf /opt/tmbed/entrypoint.sh /usr/local/bin/run \
+     && mkdir -p /input /output /db /models
+
+    printf '{\n  "tool": "tmbed",\n  "tmbed_ref": "%s",\n  "torch_version": "%s",\n  "base_image": "python:3.11-slim",\n  "build_date": "%s"\n}\n' \
+            "${TMBED_REF}" "${TORCH_VERSION}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            > /etc/pipeline-build.json
+
+%runscript
+    exec /usr/bin/tini -- /usr/local/bin/run "$@"

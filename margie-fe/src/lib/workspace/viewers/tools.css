@@ -1,0 +1,242 @@
+/* Shared file-view parts: a toolbar of pill groups, a pill text field and the
+   rounded content pane; used by the viewers, the folder view and the run log. */
+
+.vw-bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 10px;
+	min-width: 0;
+}
+.vw-grow {
+	flex: 1 1 0;
+	min-width: 0;
+}
+
+/* A group of choices in one pill; the one on is a raised pill inside it. */
+.vw-group {
+	--vw-h: var(--mg-ctl-sm, 36px);
+	display: inline-flex;
+	align-items: center;
+	flex-shrink: 0;
+	gap: 2px;
+	height: var(--vw-h);
+	padding: 3px;
+	border: 1px solid var(--mg-border);
+	border-radius: var(--mg-r-sm);
+	background: color-mix(in srgb, var(--mg-text) 4%, var(--mg-surface));
+}
+.vw-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	height: 100%;
+	min-width: 0;
+	padding: 0 12px;
+	border: none;
+	border-radius: var(--mg-r-sm);
+	background: transparent;
+	color: var(--mg-text-2);
+	font: inherit;
+	font-size: var(--mg-fs-sm);
+	font-weight: 500;
+	white-space: nowrap;
+	text-decoration: none;
+	cursor: pointer;
+	transition:
+		background-color var(--mo-1, 120ms) ease,
+		color var(--mo-1, 120ms) ease,
+		box-shadow var(--mo-1, 120ms) ease;
+}
+.vw-btn:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--mg-text) 7%, transparent);
+	color: var(--mg-text);
+}
+.vw-btn:is([aria-pressed='true'], [aria-selected='true'], .on) {
+	background: var(--mg-surface);
+	color: var(--mg-text);
+	box-shadow:
+		0 0 0 1px color-mix(in srgb, var(--mg-accent) 45%, var(--mg-border)),
+		var(--mg-shadow-sm);
+}
+.vw-btn:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+.vw-btn.icon {
+	aspect-ratio: 1;
+	padding: 0;
+}
+.vw-btn svg {
+	flex-shrink: 0;
+}
+/* A plain count or page number sitting in a group. */
+.vw-num {
+	padding: 0 8px;
+	font-size: var(--mg-fs-xs);
+	font-variant-numeric: tabular-nums;
+	color: var(--mg-text-2);
+	white-space: nowrap;
+}
+.vw-group select {
+	height: 100%;
+	padding: 0 26px 0 12px;
+	border: none;
+	border-radius: var(--mg-r-sm);
+	background: transparent
+		url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6' fill='none' stroke='%23888' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E")
+		right 10px center / 9px no-repeat;
+	color: var(--mg-text-2);
+	font: inherit;
+	font-size: var(--mg-fs-sm);
+	appearance: none;
+	cursor: pointer;
+}
+.vw-group select:hover {
+	color: var(--mg-text);
+}
+
+/* A pill on its own: an action (Download, Copy), with or without an icon. */
+.vw-pill {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	gap: 7px;
+	height: var(--mg-ctl-sm, 36px);
+	padding: 0 15px;
+	border: 1px solid var(--mg-border-strong);
+	border-radius: var(--mg-r-sm);
+	background: var(--mg-surface);
+	color: var(--mg-text);
+	font: inherit;
+	font-size: var(--mg-fs-sm);
+	font-weight: 500;
+	white-space: nowrap;
+	text-decoration: none;
+	cursor: pointer;
+	transition:
+		border-color var(--mo-1, 120ms) ease,
+		background-color var(--mo-1, 120ms) ease;
+}
+.vw-pill:hover:not(:disabled) {
+	border-color: var(--mg-accent);
+	background: color-mix(in srgb, var(--mg-accent) 7%, var(--mg-surface));
+}
+.vw-pill.primary {
+	border-color: transparent;
+	background: var(--mg-accent);
+	color: var(--mg-on-accent);
+}
+.vw-pill.primary:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--mg-accent) 86%, var(--mg-text));
+}
+.vw-pill.danger {
+	border-color: color-mix(in srgb, var(--mg-danger) 50%, transparent);
+	color: var(--mg-danger);
+}
+.vw-pill.danger:hover:not(:disabled) {
+	border-color: var(--mg-danger);
+	background: color-mix(in srgb, var(--mg-danger) 8%, var(--mg-surface));
+}
+.vw-pill.sm {
+	height: 28px;
+	padding: 0 12px;
+	font-size: var(--mg-fs-xs);
+}
+.vw-pill.icon {
+	aspect-ratio: 1;
+	padding: 0;
+}
+.vw-pill:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+
+/* A field to type into, as a pill with its icon inside. */
+.vw-field {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+	height: var(--mg-ctl-sm, 36px);
+	padding: 0 14px;
+	border: 1px solid var(--mg-border-strong);
+	border-radius: var(--mg-r-sm);
+	background: var(--mg-surface);
+	color: var(--mg-text-3);
+	transition:
+		border-color var(--mo-1, 120ms) ease,
+		box-shadow var(--mo-1, 120ms) ease;
+}
+.vw-field:focus-within {
+	border-color: var(--mg-accent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--mg-accent) 16%, transparent);
+}
+.vw-field input {
+	flex: 1 1 auto;
+	min-width: 0;
+	height: 100%;
+	padding: 0;
+	border: none;
+	outline: none;
+	background: transparent;
+	color: var(--mg-text);
+	font: inherit;
+	font-size: var(--mg-fs-sm);
+}
+.vw-field input::placeholder {
+	color: var(--mg-text-3);
+}
+.vw-field input::-webkit-search-cancel-button {
+	cursor: pointer;
+}
+
+/* The content's own box: rounded, a hairline, lifted a little. */
+.vw-pane {
+	border: 1px solid var(--mg-border);
+	border-radius: var(--mg-r);
+	background: var(--mg-surface);
+	box-shadow: var(--mg-shadow-sm);
+	overflow: hidden;
+}
+
+/* A message in the middle of an empty pane. */
+.vw-msg {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	padding: 36px 16px;
+	text-align: center;
+	color: var(--mg-text-3);
+	font-size: var(--mg-fs-sm);
+}
+.vw-msg.bad {
+	color: var(--mg-danger);
+}
+
+/* A viewer is a size container: in a narrow pane its buttons drop their labels. */
+.vw-scope {
+	container: vw / inline-size;
+}
+@container vw (max-width: 620px) {
+	.vw-lbl {
+		display: none;
+	}
+	.vw-btn:has(> .vw-lbl),
+	.vw-pill:has(> .vw-lbl) {
+		padding: 0 10px;
+	}
+}
+
+@media (max-width: 520px) {
+	.vw-btn {
+		padding: 0 10px;
+	}
+	.vw-pill {
+		padding: 0 12px;
+	}
+}

@@ -1,0 +1,11 @@
+DBCAN_VERSION=5.1.2
+DBCAN_SOURCE=https://pypi.org/project/dbcan/5.1.2/
+PYRODIGAL_VERSION=3.6.3
+PYRODIGAL_SOURCE=https://pypi.org/project/pyrodigal/3.6.3/
+HMMER_VERSION=3.4
+HMMER_SOURCE=http://eddylab.org/software/hmmer/hmmer-3.4.tar.gz
+DIAMOND_VERSION=2.1.9
+DIAMOND_SOURCE=https://github.com/bbuchfink/diamond/archive/refs/tags/v2.1.9.tar.gz
+DBCAN_DB_RELEASE=v13
+DBCAN_DB_SOURCE=https://bcb.unl.edu/dbCAN2/download/Databases/
+BASE_IMAGE=python:3.11-slim

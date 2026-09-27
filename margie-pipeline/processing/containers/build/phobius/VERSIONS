@@ -1,0 +1,5 @@
+tool=phobius
+base_image=ubuntu:22.04
+upstream=http://phobius.sbc.su.se/ (academic license, NOT redistributable)
+tarball=phobius101_linux.tgz
+license=LicenseRef-phobius-academic

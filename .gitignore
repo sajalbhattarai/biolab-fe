@@ -1,0 +1,4 @@
+.DS_Store
+
+# Local-mode settings the app writes into its pipeline copy; never shared.
+margie-pipeline/gui/

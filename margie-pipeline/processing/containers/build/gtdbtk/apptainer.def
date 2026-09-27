@@ -1,0 +1,53 @@
+Bootstrap: docker
+From: mambaorg/micromamba:1.5.8
+
+%files
+    entrypoint.sh        /opt/gtdbtk/entrypoint.sh
+    scripts              /opt/gtdbtk/scripts/
+    patches/markers.py   /opt/gtdbtk/patches/markers.py
+    LICENSE.md           /opt/gtdbtk/LICENSE.md
+    VERSIONS             /opt/gtdbtk/VERSIONS
+
+%labels
+    org.opencontainers.image.title       gtdbtk
+    org.opencontainers.image.description "GTDB-Tk collection-level taxonomy classification"
+    org.opencontainers.image.source      https://github.com/margie-annotation/margie-pipeline
+    org.opencontainers.image.vendor      margie-annotation
+    org.opencontainers.image.licenses    GPL-3.0-or-later
+    org.opencontainers.image.version     gtdbtk-2.7.0
+
+%environment
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8
+    export MAMBA_ROOT_PREFIX=/opt/conda
+
+    apt-get update && apt-get install -y --no-install-recommends \
+            bash tini ca-certificates \
+        && rm -rf /var/lib/apt/lists/*
+
+    micromamba create -y -n gtdbtk \
+        -c conda-forge -c bioconda \
+        python=3.11 gtdbtk=2.7.0 matplotlib biopython \
+      && micromamba clean --all --yes
+
+    GTDBTK_SITE=/opt/conda/envs/gtdbtk/lib/python3.11/site-packages/gtdbtk
+
+    # Patch bac_ar_diff unbound-variable bug (v2.7.0, --place_species + all-ANI collections)
+    sed -i 's/^        if not all_classified_ani and not all_failed_prodigal:/        bac_ar_diff = {}\n        if not all_classified_ani and not all_failed_prodigal:/' \
+        "$GTDBTK_SITE/classify.py"
+
+    # Apply fixed markers.py (genome_domain fails when align_dir is absent)
+    cp /opt/gtdbtk/patches/markers.py "$GTDBTK_SITE/markers.py"
+
+    chmod -R a+rX /opt/gtdbtk \
+      && find /opt/gtdbtk -type f \( -name '*.sh' -o -name '*.py' \) -exec chmod a+x {} + \
+      && ln -sf /opt/gtdbtk/entrypoint.sh /usr/local/bin/run \
+      && mkdir -p /input /output /db
+
+%runscript
+    exec /usr/local/bin/run "$@"

@@ -1,0 +1,11 @@
+meta/
+context/etc/
+context/root/
+context/usr/
+context/var/
+context/home/
+context/opt/conda/
+**/__pycache__/
+**/*.pyc
+.DS_Store
+Dockerfile.bak

@@ -1,0 +1,91 @@
+# secrets
+.gh-token
+*.token
+.env
+.env.*
+**/hf_token
+
+# HuggingFace download venv (created on demand by setup-databases)
+processing/.hf-env/
+
+# Python environment for margie-backend's host scripts (created on demand by run-meta.sh)
+processing/.host-env/
+processing/.host-env.lock/
+
+# BV-BRC CLI session (created on demand by run-rasttk.sh when BVBRC_LOGIN=1)
+processing/.bvbrc/
+
+# auto-generated SLURM job scripts (written by generate-slurm-scripts.sh on every setup run).
+# These contain real account/partition names from pipeline.conf.sh — never committed.
+# Edit pipeline.conf.sh section 9 to change cluster settings, then run:
+#   ./setup.sh --generate-slurm
+accessory-files/slurm/setup.slurm
+accessory-files/slurm/containers.slurm
+accessory-files/slurm/databases.slurm
+accessory-files/slurm/annotate.slurm
+accessory-files/slurm/annotate-classify.slurm
+accessory-files/slurm/annotate-downstream.slurm
+accessory-files/slurm/run-meta.slurm
+accessory-files/slurm/gtdbtk-highmem.slurm
+accessory-files/slurm/llm.slurm
+
+# build artifacts
+processing/containers/sifs/
+*.sif
+
+# logs — ignore all content, preserve empty-dir markers
+logs/**
+!logs/
+!logs/*/
+!logs/**/.gitkeep
+
+# run output / annotation files (genome sequences, gene calls, annotations)
+*.fna
+*.faa
+*.ffn
+*.fasta
+*.gbk
+*.gff
+*.gff3
+*.gto
+*.gto.*
+
+# auto-generated apptainer defs (from spython conversion)
+processing/containers/build/*/.apptainer.def.auto
+
+# os cruft
+.DS_Store
+Thumbs.db
+
+# editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# local backup snapshots — not versioned
+backup-input/
+backup-output/
+
+# user data (keep folder skeletons, ignore contents)
+input/**
+!input/
+!input/.gitkeep
+output/**
+!output/
+!output/.gitkeep
+db/**
+!db/
+!db/.gitkeep
+
+# local documentation (pipeline notes, flow diagrams — not tracked in git)
+/docs/
+
+__pycache__/
+
+# per-genome domain / genetic code table (user data, like the genomes themselves)
+user-input/genome-metadata.tsv
+
+# Data and run records, not code: the thesis database is 29 GB.
+*.db
+run-history/

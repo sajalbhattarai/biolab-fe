@@ -1,0 +1,78 @@
+/* Shared motion styles; durations and easings come from the --mo-* variables
+   (prefs.ts motionVars). */
+
+/* Page changes: only the content moves (see page.ts). */
+@keyframes mo-vt-out {
+	to {
+		opacity: 0;
+		transform: translateY(-4px);
+	}
+}
+@keyframes mo-vt-in {
+	from {
+		opacity: 0;
+		transform: translateY(10px);
+	}
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+	animation: none;
+}
+/* A floating bar (Atlas) stays as it is: the new one shows at once. */
+::view-transition-old(mo-bar) {
+	display: none;
+}
+::view-transition-new(mo-bar) {
+	animation: none;
+}
+::view-transition-old(mo-main) {
+	animation: mo-vt-out calc(var(--vt-dur, 300ms) * 0.55) cubic-bezier(0.4, 0, 1, 1) both;
+}
+::view-transition-new(mo-main) {
+	animation: mo-vt-in var(--vt-dur, 300ms) cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+	::view-transition-group(*),
+	::view-transition-old(*),
+	::view-transition-new(*) {
+		animation: none !important;
+	}
+}
+
+/* During a pane resize: no text selection, no easing, and frames ignore the pointer. */
+.mo-resizing,
+.mo-resizing * {
+	cursor: col-resize !important;
+	user-select: none !important;
+	-webkit-user-select: none !important;
+}
+.mo-resizing * {
+	transition: none !important;
+}
+.mo-resizing iframe {
+	pointer-events: none;
+}
+
+/* Sliding selection (thumb.ts): the group draws it, so the selected item
+   drops its own background. */
+.mo-has-thumb {
+	position: relative;
+	isolation: isolate;
+}
+.mo-has-thumb > .mo-thumb {
+	position: absolute;
+	top: 0;
+	left: 0;
+	z-index: -1;
+	pointer-events: none;
+	transition:
+		transform var(--mo-2) var(--mo-ease),
+		width var(--mo-2) var(--mo-ease),
+		height var(--mo-2) var(--mo-ease),
+		opacity var(--mo-1) ease;
+}
+.mo-has-thumb > [aria-selected='true'],
+.mo-has-thumb > [aria-checked='true'],
+.mo-has-thumb > [aria-current='page'] {
+	background: transparent !important;
+}

@@ -1,0 +1,2 @@
+tool=signalP4
+status=stub (not yet buildable; registered in pipeline.conf.sh for future implementation)

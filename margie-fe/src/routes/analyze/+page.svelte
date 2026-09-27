@@ -1,0 +1,550 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { authHeaders, clearToken } from '$lib/auth.js';
+	import ConfigField from '$lib/ConfigField.svelte';
+	import LicenseGate from '$lib/LicenseGate.svelte';
+	import { fetchLicenseStatus, revokeLicense } from '$lib/license';
+	import { isWorkflowPathParam, getNestedValue, setNestedValue } from '$lib/configParams';
+	import { getApiUrl } from '$lib/config';
+
+	const API_URL = getApiUrl();
+
+	function handle401() { clearToken(); goto('/login'); }
+
+	async function confirmRevoke() {
+		if (revoking) return;
+		revoking = true;
+		revokeError = '';
+		try {
+			await revokeLicense();
+			// Returns to the gate, which also shows on the next load.
+			licenseAccepted = false;
+			showRevokeConfirm = false;
+		} catch (e) {
+			if (e instanceof Error && e.message === 'unauthorized') { handle401(); return; }
+			revokeError = e instanceof Error ? e.message : 'Failed to revoke license';
+		} finally {
+			revoking = false;
+		}
+	}
+
+	interface WorkflowDetails {
+		id: string;
+		label: string;
+		description: string;
+		full_description: string;
+		tools: Array<{key?: string; phase?: number; name: string; purpose: string; version: string; output: string}>;
+		configurable_params: Array<{param: string; default: any; description: string; type: string}>;
+		database_deps: string[];
+		docs_url: string | null;
+		containers: Array<{name: string; version: string}>;
+		// Backend also returns these fields
+		cmd_identifier: string;
+		snakemake_file: string;
+		other: string[];
+		sif_files: Array<[string, string]>;
+	}
+
+	let genomePath = $state('');
+	let outputDir = $state('');
+	// The full per-genome operon atlas opt-in lives in Profile (run_full_operon_map),
+	// where the backend reads it from the saved config.
+	let homeDir = $state('');
+	let selectedWorkflow = $state('margie_sb');
+	let userConfig = $state<Record<string, any>>({});
+	let availableWorkflows = $state<WorkflowDetails[]>([]);
+	let loading = $state(false);
+	let quickLoading = $state(false);
+	let freshLoading = $state(false);
+	let error = $state('');
+	let licenseChecking = $state(true);
+	let licenseAccepted = $state(false);
+	// Self-service licence revocation (small button above the workflow box).
+	let showRevokeConfirm = $state(false);
+	let revoking = $state(false);
+	let revokeError = $state('');
+	let selectedTools = $state<Set<string>>(new Set());
+	let disabledTools = $state<Set<string>>(new Set());
+	let savingPathSettings = $state(false);
+	let pathSettingsSaved = $state(false);
+	// Matches profile/+page.svelte's REQUIRED_TOOL_KEYS.
+	const REQUIRED_TOOL_KEYS = new Set(['rasttk']);
+
+	// Live preview of the full output path (timestamp is illustrative — generated server-side)
+	let outputPreview = $derived(
+		`${(outputDir.trim() || homeDir || '~').replace(/\/$/, '')}/YYYY-MM-DD-HHMM`
+	);
+
+	// The selected workflow's tools that support per-tool selection, in a stable order.
+	let selectableTools = $derived(
+		(availableWorkflows.find(w => w.id === selectedWorkflow)?.tools ?? [])
+			.filter((t): t is {key: string; phase: number; name: string; purpose: string; version: string; output: string} =>
+				!!t.key && t.phase !== undefined)
+	);
+	let toolsByPhase = $derived.by(() => {
+		const groups = new Map<number, typeof selectableTools>();
+		for (const tool of selectableTools) {
+			if (!groups.has(tool.phase)) groups.set(tool.phase, []);
+			groups.get(tool.phase)!.push(tool);
+		}
+		return [...groups.entries()].sort((a, b) => a[0] - b[0]);
+	});
+	let requiredToolKeys = $derived(
+		selectableTools.filter(t => REQUIRED_TOOL_KEYS.has(t.key)).map(t => t.key)
+	);
+
+	function enforceRequiredTools(tools: Set<string>) {
+		const next = new Set(tools);
+		for (const key of requiredToolKeys) next.add(key);
+		return next;
+	}
+
+	// sif_path/db_root for the selected workflow; input_path/output_path have
+	// their own cards below.
+	let selectedWorkflowPathParams = $derived(
+		(availableWorkflows.find(w => w.id === selectedWorkflow)?.configurable_params ?? [])
+			.filter(p => isWorkflowPathParam(p.param) && !p.param.endsWith('.input_path') && !p.param.endsWith('.output_path'))
+	);
+
+	function prettyPathLabel(paramKey: string): string {
+		const humanize = (value: string): string =>
+			value
+				.replace(/_/g, ' ')
+				.replace(/\b\w/g, ch => ch.toUpperCase());
+
+		const fullKeyLabels: Record<string, string> = {
+			'margie_sb.fingerprint_database.path': 'Fingerprint Database TSV',
+			'margie_sb.genome_pool.path': 'Genome Pool Root',
+			'margie_sb.final_tables_depot.path': 'Final Tables Export Root',
+			'margie_sb.scoring_results_historical.path': 'Historical Scoring Archive Root',
+			'margie_sb.sqlite_pipeline_snapshot.path': 'SQLite Snapshot Queue Root',
+		};
+		if (fullKeyLabels[paramKey]) return fullKeyLabels[paramKey];
+
+		const parts = paramKey.split('.');
+		const leaf = parts[parts.length - 1] || paramKey;
+		const labels: Record<string, string> = {
+			sif_path: 'Container Root (SIF)',
+			db_root: 'Database Root',
+			operon_db: 'Report Figures Operon DB',
+			occ_reference_pkl: 'OCC Reference Database',
+		};
+		if (labels[leaf]) return labels[leaf];
+		if (leaf === 'path' && parts.length >= 2) return `${humanize(parts[parts.length - 2])} Path`;
+		return humanize(leaf);
+	}
+
+	function updateWorkflowPathValue(param: string, value: any) {
+		setNestedValue(userConfig, param.split('.'), value);
+		userConfig = { ...userConfig };
+	}
+
+	async function savePathSettings() {
+		savingPathSettings = true;
+		pathSettingsSaved = false;
+		try {
+			const configToSave = JSON.parse(JSON.stringify(userConfig));
+			const response = await fetch(`${API_URL}/v1/ssh/config`, {
+				method: 'PUT',
+				headers: authHeaders(),
+				body: JSON.stringify(configToSave),
+			});
+			if (response.status === 401) { handle401(); return; }
+			if (!response.ok) throw new Error('Failed to save workflow paths');
+
+			userConfig = configToSave;
+			pathSettingsSaved = true;
+			setTimeout(() => pathSettingsSaved = false, 2000);
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to save workflow paths';
+		} finally {
+			savingPathSettings = false;
+		}
+	}
+
+	onMount(async () => {
+		// Licence gate: whether this user has accepted the current terms.
+		try {
+			const s = await fetchLicenseStatus();
+			licenseAccepted = s.accepted;
+			disabledTools = new Set(s.disabled_tools ?? []);
+		} catch (e) {
+			if (e instanceof Error && e.message === 'unauthorized') { handle401(); return; }
+		} finally {
+			licenseChecking = false;
+		}
+
+		// Fetch home_dir for the placeholder
+		try {
+			const res = await fetch(`${API_URL}/v1/auth/me`, { headers: authHeaders() });
+			if (res.status === 401) { handle401(); return; }
+			if (res.ok) homeDir = (await res.json()).home_dir;
+		} catch {}
+
+		// Fetches the saved config to autofill this workflow's input/output paths.
+		try {
+			const res = await fetch(`${API_URL}/v1/ssh/config`, { headers: authHeaders() });
+			if (res.ok) userConfig = await res.json();
+		} catch {}
+
+		// Load available workflows
+		try {
+			const res = await fetch(`${API_URL}/v1/ssh/workflows`, { headers: authHeaders() });
+			if (res.ok) {
+				availableWorkflows = await res.json();
+				if (availableWorkflows.length > 0 && !availableWorkflows.find(w => w.id === selectedWorkflow)) {
+					selectedWorkflow = availableWorkflows[0].id;
+				}
+			}
+		} catch {}
+	});
+
+	// Autofills Genome Path / Output Directory from the selected workflow's saved
+	// defaults whenever the selection changes or userConfig loads.
+	$effect(() => {
+		const wfConfig = userConfig[selectedWorkflow];
+		genomePath = wfConfig?.input_path || '';
+		outputDir = wfConfig?.output_path || '';
+	});
+
+	// Drops tools the user is not licensed for, which the server would refuse.
+	let selectedForRun = $derived(
+		new Set([...enforceRequiredTools(selectedTools)].filter((k) => !disabledTools.has(k)))
+	);
+
+	let disabledToolNames = $derived(
+		[...disabledTools].map((k) => selectableTools.find((t) => t.key === k)?.name ?? k)
+	);
+
+	async function onLicenseAccepted() {
+		licenseAccepted = true;
+		try {
+			const s = await fetchLicenseStatus();
+			disabledTools = new Set(s.disabled_tools ?? []);
+		} catch {
+			/* status refresh is best-effort; the run path still enforces */
+		}
+	}
+
+	$effect(() => {
+		const saved: string | undefined = userConfig[selectedWorkflow]?.default_selected_tools;
+		const nextSelection = saved
+			? new Set(saved.split(',').map(k => k.trim()).filter(Boolean))
+			: new Set(
+				selectableTools
+					.filter(t => t.phase !== undefined && t.phase <= 9)
+					.map(t => t.key)
+				);
+
+		selectedTools = enforceRequiredTools(nextSelection);
+	});
+
+	// Sanity checks (Quick Example / Fresh Test), authenticated like the rest of the page.
+	async function runWorkflow(endpoint: string, setLoading: (v: boolean) => void) {
+		try {
+			setLoading(true);
+			error = '';
+			const response = await fetch(`${API_URL}/v1/workflows/${endpoint}`, {
+				method: 'POST',
+				headers: authHeaders(),
+			});
+			if (response.status === 401) { handle401(); return; }
+			if (!response.ok) {
+				const errData = await response.json().catch(() => ({}));
+				throw new Error(errData.detail || `Failed to run ${endpoint}`);
+			}
+			const data = await response.json();
+			if (data.job_id) {
+				goto(`/jobs/${data.job_id}`);
+			}
+		} catch (e) {
+			error = e instanceof Error ? e.message : `Failed to run ${endpoint}`;
+		} finally {
+			setLoading(false);
+		}
+	}
+
+	async function handleAnalyze() {
+		if (selectableTools.length > 0 && selectedForRun.size === 0) {
+			error = 'Select at least one tool to run, or check them all to run the full pipeline.';
+			return;
+		}
+
+		try {
+			loading = true;
+			error = '';
+
+			// Omits selected_tools when every selectable tool is checked, which the
+			// backend treats as "run everything".
+			const allSelected = selectedForRun.size === selectableTools.length;
+
+			const response = await fetch(`${API_URL}/v1/ssh/run_workflow`, {
+				method: 'POST',
+				headers: authHeaders(),
+				body: JSON.stringify({
+					genome_path: genomePath,
+					output_dir: outputDir,
+					workflow: selectedWorkflow,
+					selected_tools: allSelected ? null : Array.from(selectedForRun),
+				}),
+			});
+
+			if (response.status === 401) { handle401(); return; }
+			if (!response.ok) {
+				const errData = await response.json().catch(() => ({}));
+				throw new Error(errData.detail || 'Failed to start analysis');
+			}
+
+			const data = await response.json();
+			console.log('Analysis started:', data);
+
+			if (data.job_id) {
+				goto(`/jobs/${data.job_id}`);
+			}
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to start analysis';
+			console.error('Error starting analysis:', e);
+		} finally {
+			loading = false;
+		}
+	}
+</script>
+
+<div class="w-full px-4 md:px-6 py-8">
+	<h1 class="text-4xl font-bold mb-8 text-center text-primary-500">Genome Analysis</h1>
+
+	{#if licenseChecking}
+		<p class="text-center text-surface-500 dark:text-surface-400">Checking licensing status…</p>
+	{:else if !licenseAccepted}
+		<LicenseGate onaccepted={onLicenseAccepted} />
+	{:else}
+
+	{#if error}
+		<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+			{error}
+		</div>
+	{/if}
+
+	<!-- Revoke License (self-service) — top-right, above the workflow box -->
+	<div class="flex justify-end items-center gap-3 mb-2 min-h-8">
+		{#if revokeError}
+			<span class="text-xs text-red-600">{revokeError}</span>
+		{/if}
+		{#if showRevokeConfirm}
+			<span class="text-sm text-surface-600 dark:text-surface-300">Revoke your license acceptance?</span>
+			<button
+				type="button"
+				onclick={confirmRevoke}
+				disabled={revoking}
+				class="text-sm font-medium text-red-600 hover:underline disabled:opacity-50"
+			>
+				{revoking ? 'Revoking…' : 'Yes'}
+			</button>
+			<button
+				type="button"
+				onclick={() => (showRevokeConfirm = false)}
+				disabled={revoking}
+				class="text-sm font-medium text-surface-500 hover:underline disabled:opacity-50"
+			>
+				No
+			</button>
+		{:else}
+			<button
+				type="button"
+				onclick={() => { revokeError = ''; showRevokeConfirm = true; }}
+				class="text-sm text-surface-500 hover:text-red-600 hover:underline"
+			>
+				Revoke License
+			</button>
+		{/if}
+	</div>
+
+	{#if disabledTools.size > 0}
+		<div
+			class="text-sm rounded border border-amber-400 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 px-4 py-3 mb-4"
+		>
+			Some tools are unavailable for your usage / license and will not run:
+			<b>{disabledToolNames.join(', ')}</b>. To change this, revoke your license above and
+			re-accept with updated answers.
+		</div>
+	{/if}
+
+	<!-- Workflow Selection -->
+	{#if availableWorkflows.length > 0}
+	<div class="card p-6 bg-surface-100 dark:bg-surface-800 mb-8">
+		<h2 class="text-2xl font-semibold">Workflow</h2>
+		<p class="text-sm text-surface-500 dark:text-surface-400 mb-4">
+			Choose the workflow you want to run. The selected workflow controls which tools, dependencies, and workflow-specific configuration fields are available on this page.
+		</p>
+		<div class="flex flex-wrap gap-3">
+			{#each availableWorkflows as wf}
+				<button
+					type="button"
+					onclick={() => selectedWorkflow = wf.id}
+					class="flex flex-col items-start px-5 py-3 rounded-lg border-2 text-left transition-colors max-w-xs
+						{selectedWorkflow === wf.id
+							? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+							: 'border-surface-300 dark:border-surface-600 hover:border-surface-400 dark:hover:border-surface-500'}"
+				>
+					<span class="font-semibold">{wf.label}</span>
+					{#if wf.description}
+						<span class="text-xs text-surface-500 dark:text-surface-400 mt-1">{wf.description}</span>
+					{/if}
+				</button>
+			{/each}
+		</div>
+	</div>
+	{/if}
+
+	<!-- Tool Selection -->
+	<!-- Tool defaults are managed in Profile > Workflow Specific Settings. -->
+
+	<!-- Run Input -->
+	<div class="card p-6 bg-surface-100 dark:bg-surface-800 mb-8">
+		<h2 class="text-2xl font-semibold">Run Input (Genome File or Folder)</h2>
+		<p class="text-sm text-surface-500 dark:text-surface-400 mb-4">
+			Enter the genome file you want to analyze, or a folder of genomes if the selected workflow supports batch input.
+			If left blank, Analyze uses the workflow's saved default input from Profile.
+		</p>
+		<input
+			type="text"
+			bind:value={genomePath}
+			placeholder={selectedWorkflow === 'margie_sb'
+				? 'Enter a genome file or a folder of genomes...'
+				: 'Enter genome file path...'}
+			class="w-full px-4 py-2 rounded border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-900"
+		/>
+	</div>
+
+	<!-- Run Output Base -->
+	<div class="card p-6 bg-surface-100 dark:bg-surface-800 mb-8">
+		<h2 class="text-2xl font-semibold">Run Output Base Directory</h2>
+		<p class="text-sm text-surface-500 dark:text-surface-400 mb-4">
+			This is the base folder where results will be written. Analyze appends a timestamp automatically so each run lands in its own folder.
+			If left blank, Analyze uses your home directory, or the workflow's saved default output directory.
+		</p>
+		<input
+			type="text"
+			bind:value={outputDir}
+			placeholder={homeDir || 'Loading...'}
+			class="w-full px-4 py-2 rounded border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-900"
+		/>
+		<div class="mt-2 text-xs text-surface-400">
+			<code class="font-mono text-xs bg-surface-200 dark:bg-surface-700 px-1 py-0.5 rounded">{outputPreview}</code>
+		</div>
+	</div>
+
+	<!-- Advanced Workflow Roots (sif_path / db_root) -->
+	{#if selectedWorkflowPathParams.length > 0}
+	<details class="mb-8 group">
+		<summary class="card p-4 bg-surface-100 dark:bg-surface-800 cursor-pointer list-none">
+			<div class="flex items-center justify-between">
+				<div>
+					<h2 class="text-2xl font-semibold">Advanced Workflow Roots (Containers and Databases)</h2>
+					<p class="text-xs text-surface-500 dark:text-surface-400 mt-1">
+						These are infrastructure roots for the selected workflow (for example SIF root and DB root).
+						Most users can leave these unchanged unless pointing to a custom installation or shared storage layout.
+					</p>
+				</div>
+				<span class="text-xs text-surface-500 group-open:hidden">Expand</span>
+				<span class="text-xs text-surface-500 hidden group-open:inline">Collapse</span>
+			</div>
+		</summary>
+		<div class="card p-6 bg-surface-100 dark:bg-surface-800 mt-2">
+			<div class="flex items-center justify-between mb-4">
+				<button type="button" onclick={savePathSettings} disabled={savingPathSettings}
+					class="text-xs px-3 py-1 rounded font-semibold bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50">
+					{savingPathSettings ? 'Saving...' : pathSettingsSaved ? 'Saved!' : 'Save'}
+				</button>
+			</div>
+			<div class="space-y-2">
+				{#each selectedWorkflowPathParams as param}
+					{@const value = getNestedValue(userConfig, param.param.split('.'))}
+					<ConfigField
+						param={param.param}
+						label={prettyPathLabel(param.param)}
+						type={param.type}
+						description={param.description}
+						default={param.default}
+						required={false}
+						value={value}
+						onchange={(newVal) => updateWorkflowPathValue(param.param, newVal)}
+					/>
+				{/each}
+			</div>
+		</div>
+	</details>
+	{/if}
+
+	<!-- Analyze Button -->
+	<div class="card p-6 bg-surface-100 dark:bg-surface-800">
+		<button
+			type="button"
+			onclick={handleAnalyze}
+			disabled={loading}
+			class="btn px-10 py-3 text-lg font-bold text-white bg-purple-500 hover:bg-green-500 disabled:opacity-50 shadow-lg transition-colors"
+		>
+			{loading ? 'Starting Analysis...' : 'Analyze'}
+		</button>
+	</div>
+
+	<!-- Divider -->
+	<details class="mt-8 group">
+		<summary class="card p-4 bg-surface-100 dark:bg-surface-800 cursor-pointer list-none">
+			<div class="flex items-center justify-between">
+				<div>
+					<h2 class="text-2xl font-semibold">Sanity Checks</h2>
+					<p class="text-xs text-surface-500 dark:text-surface-400 mt-1">
+						Use the built-in test workflows to verify SSH access, Snakemake execution, and the pipeline wiring before you launch a real job.
+						Quick Example is a lightweight test that can cache hit. Fresh Test always forces a clean run in a temporary directory.
+					</p>
+				</div>
+				<span class="text-xs text-surface-500 group-open:hidden">Expand</span>
+				<span class="text-xs text-surface-500 hidden group-open:inline">Collapse</span>
+			</div>
+		</summary>
+
+		<!-- Test Workflows -->
+		<div class="card p-6 bg-surface-100 dark:bg-surface-800 mt-2">
+			<h2 class="text-2xl font-semibold mb-6">Test Workflows</h2>
+
+			<div class="flex flex-wrap gap-4">
+			<!-- Quick Example -->
+			<div class="flex flex-col gap-2 max-w-xs">
+				<button
+					type="button"
+					onclick={() => runWorkflow('run_quick_example', (v) => quickLoading = v)}
+					disabled={quickLoading}
+					class="btn px-6 py-2 text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
+				>
+					{quickLoading ? 'Running...' : 'Quick Example'}
+				</button>
+				<p class="text-xs text-surface-500 dark:text-surface-400">
+					Runs a lightweight end-to-end test over SSH. It touches Snakemake and the DB cache pipeline without spinning up containers.
+					If you have run it before, it will often cache hit and finish almost instantly.
+				</p>
+			</div>
+
+			<!-- Fresh Test -->
+			<div class="flex flex-col gap-2 max-w-xs">
+				<button
+					type="button"
+					onclick={() => runWorkflow('run_fresh_test', (v) => freshLoading = v)}
+					disabled={freshLoading}
+					class="btn px-6 py-2 text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50"
+				>
+					{freshLoading ? 'Running...' : 'Fresh Test'}
+				</button>
+				<p class="text-xs text-surface-500 dark:text-surface-400">
+					Always writes to a temporary directory and bypasses the cache, so you get a true fresh run every time.
+					Use this when you want to verify the full pipeline works end-to-end without relying on any prior state.
+				</p>
+			</div>
+		</div>
+		</div>
+	</details>
+
+	{/if}
+</div>
+

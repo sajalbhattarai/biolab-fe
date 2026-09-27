@@ -1,0 +1,4 @@
+tool=interpro
+base_image=eclipse-temurin:11-jre-jammy (linux/amd64)
+upstream=https://github.com/ebi-pf-team/interproscan
+license=Apache-2.0

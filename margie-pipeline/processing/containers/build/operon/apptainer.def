@@ -1,0 +1,66 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# operon — apptainer recipe (hand-translated from Dockerfile)
+# UniOP intergenic-distance operon prediction.
+# UniOP source vendored under ./UniOP (snapshot of https://github.com/hongsua/UniOP
+# main branch as of 2025-05-30). Snapshot URL + commit are recorded in VERSIONS.
+# Prodigal from Debian apt; pure-Python deps from PyPI with pinned versions.
+# See LICENSE.md for license terms.
+# ──────────────────────────────────────────────────────────────────────────────
+
+Bootstrap: docker
+From: python:3.11-slim
+
+%files
+    UniOP         /opt/UniOP
+    entrypoint.sh /opt/operon/entrypoint.sh
+    scripts      /opt/operon/
+    LICENSE.md    /opt/operon/LICENSE.md
+    VERSIONS      /opt/operon/VERSIONS
+
+%labels
+    org.opencontainers.image.title         operon
+    org.opencontainers.image.description   "UniOP intergenic-distance operon prediction (vendored snapshot)"
+    org.opencontainers.image.source        https://github.com/sajalbhattarai/containers
+    org.opencontainers.image.vendor        margie-annotation
+    org.opencontainers.image.licenses      MIT
+    org.opencontainers.image.version       uniop-snapshot-2025-05-30
+
+%environment
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+    export UNIOP_HOME=/opt/UniOP
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+    export UNIOP_HOME=/opt/UniOP
+
+    apt-get update && apt-get install -y --no-install-recommends \
+            tini bash ca-certificates prodigal \
+     && rm -rf /var/lib/apt/lists/*
+
+    # Pinned Python deps for UniOP (pure Python + manylinux wheels — multi-arch safe)
+    pip install --no-cache-dir \
+            "numpy==1.26.4" \
+            "pandas==2.2.2" \
+            "scikit-learn==1.4.2" \
+            "scipy==1.13.1" \
+            "joblib==1.4.2"
+
+    chmod +x /opt/UniOP/src/UniOP \
+     && ln -sf /opt/UniOP/src/UniOP /usr/local/bin/UniOP
+
+    chmod -R a+rX /opt/operon \
+     && find /opt/operon -type f \( -name '*.sh' -o -name '*.py' \) -exec chmod a+x {} + \
+     && ln -sf /opt/operon/entrypoint.sh /usr/local/bin/run \
+     && mkdir -p /input /output /db
+
+    printf '{\n  "tool": "operon",\n  "uniop_snapshot": "2025-05-30",\n  "uniop_upstream": "https://github.com/hongsua/UniOP",\n  "base_image": "python:3.11-slim",\n  "build_date": "%s"\n}\n' \
+            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            > /etc/pipeline-build.json
+
+%runscript
+    exec /usr/bin/tini -- /usr/local/bin/run "$@"

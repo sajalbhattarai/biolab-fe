@@ -1,0 +1,9 @@
+EGGNOG_MAPPER_VERSION=2.1.12
+EGGNOG_MAPPER_SOURCE=https://pypi.org/project/eggnog-mapper/2.1.12/
+HMMER_VERSION=3.4
+HMMER_SOURCE=http://eddylab.org/software/hmmer/hmmer-3.4.tar.gz
+DIAMOND_VERSION=2.1.9
+DIAMOND_SOURCE=https://github.com/bbuchfink/diamond/archive/refs/tags/v2.1.9.tar.gz
+EGGNOG_DB_RELEASE=5.0.2
+EGGNOG_DB_SOURCE=http://eggnogdb.embl.de/download/emapperdb-5.0.2/
+BASE_IMAGE=python:3.11-slim

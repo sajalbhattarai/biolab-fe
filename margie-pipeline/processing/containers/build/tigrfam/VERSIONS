@@ -1,0 +1,6 @@
+# Pinned upstream versions baked into this image.
+HMMER_VERSION=3.4
+HMMER_SOURCE=http://eddylab.org/software/hmmer/hmmer-3.4.tar.gz
+TIGRFAMS_RELEASE=15.0
+TIGRFAMS_SOURCE=https://ftp.ncbi.nlm.nih.gov/hmm/TIGRFAMs/release_15.0/
+BASE_IMAGE=debian:12-slim

@@ -1,0 +1,75 @@
+Bootstrap: docker
+From: python:3.11-slim
+
+%files
+    entrypoint.sh /opt/closest/entrypoint.sh
+    scripts      /opt/closest/
+    LICENSE.md    /opt/closest/LICENSE.md
+    VERSIONS      /opt/closest/VERSIONS
+
+%labels
+    org.opencontainers.image.title       closest
+    org.opencontainers.image.description "Rank top-N closest organisms per genome from AAI + ANI matrices"
+    org.opencontainers.image.source      https://github.com/sajalbhattarai/margie-pipeline
+    org.opencontainers.image.vendor      margie-annotation
+    org.opencontainers.image.licenses    MIT
+    org.opencontainers.image.version     1.0.0
+
+%environment
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+
+    apt-get update && apt-get install -y --no-install-recommends \
+            tini bash ca-certificates \
+     && rm -rf /var/lib/apt/lists/*
+
+    pip install --no-cache-dir pandas
+
+    chmod -R a+rX /opt/closest \
+     && find /opt/closest -type f \( -name '*.sh' -o -name '*.py' \) -exec chmod a+x {} + \
+     && ln -sf /opt/closest/entrypoint.sh /usr/local/bin/run \
+     && mkdir -p /input /output
+
+    printf '{"tool":"closest","base_image":"python:3.11-slim"}\n' \
+        > /etc/pipeline-build.json
+
+%runscript
+    exec /usr/local/bin/run "$@"
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    GTDBTK_VERSION=2.4.0
+    MINIFORGE_VERSION=24.3.0-0
+
+    apt-get update && apt-get install -y --no-install-recommends \
+            tini bash ca-certificates wget python3 python3-pip \
+     && rm -rf /var/lib/apt/lists/*
+
+    # Install Miniforge3 — selects the correct arch binary automatically
+    arch="$(uname -m)"
+    wget -q "https://github.com/conda-forge/miniforge/releases/download/${MINIFORGE_VERSION}/Miniforge3-${MINIFORGE_VERSION}-Linux-${arch}.sh" \
+        -O /tmp/miniforge.sh
+    bash /tmp/miniforge.sh -b -p /opt/conda
+    rm /tmp/miniforge.sh
+    export PATH="/opt/conda/bin:${PATH}"
+
+    # Install GTDB-Tk and all its binary dependencies from bioconda
+    conda install -y -c bioconda -c conda-forge "gtdbtk=${GTDBTK_VERSION}"
+    conda clean --all --yes --force-pkgs-dirs
+
+    chmod -R a+rX /opt/closest \
+     && find /opt/closest -type f \( -name '*.sh' -o -name '*.py' \) -exec chmod a+x {} + \
+     && ln -sf /opt/closest/entrypoint.sh /usr/local/bin/run \
+     && mkdir -p /input /output /db/gtdbtk
+
+    printf '{\n  "tool": "closest",\n  "gtdbtk_version": "%s",\n  "base_image": "debian:12-slim"\n}\n' \
+        "${GTDBTK_VERSION}" > /etc/pipeline-build.json
+
+%runscript
+    exec /usr/local/bin/run "$@"

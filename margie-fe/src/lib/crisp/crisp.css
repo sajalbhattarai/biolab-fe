@@ -1,0 +1,594 @@
+/* Crisp (Modern) styles: a plain page, hairline rules, colour only where it
+   means something. Sizes, spacing, tint and width come from the --cr-* and
+   --mg-* variables set in crisp/theme.ts. */
+
+.crisp {
+	position: fixed;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	color: var(--mg-text);
+	background: var(--mg-bg);
+	font-family: var(--mg-font);
+	font-size: var(--cr-fs-body);
+	line-height: 1.5;
+	-webkit-font-smoothing: antialiased;
+}
+.crisp *,
+.crisp *::before,
+.crisp *::after {
+	box-sizing: border-box;
+}
+.crisp :where(h1, h2, h3, h4, p, ul, ol, dl, dd, figure) {
+	margin: 0;
+}
+.crisp :where(ul, ol) {
+	list-style: none;
+	padding: 0;
+}
+.crisp a {
+	color: inherit;
+	text-decoration: none;
+}
+.crisp :focus-visible {
+	outline: 2px solid var(--mg-accent);
+	outline-offset: 2px;
+}
+[hidden] {
+	display: none !important;
+}
+
+/* ---------------------------------------------------------------- page */
+
+.cr-page {
+	width: 100%;
+	max-width: var(--cr-width);
+	margin: 0 auto;
+	padding: 14px var(--cr-gutter) calc(var(--cr-gutter) * 2);
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+
+/* A page's head on one line: title in the page's hue, a grey caption, and the
+   summary number and actions at the right. */
+.cr-head {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto auto;
+	grid-template-areas: 'title lede meta acts';
+	align-items: center;
+	gap: 4px 18px;
+	min-height: 34px;
+}
+/* A plain small label above a page title. */
+.cr-eyebrow {
+	display: none;
+}
+.cr-title {
+	grid-area: title;
+	font-size: calc(var(--cr-fs-page) * 0.8);
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	line-height: 1.2;
+	color: var(--cr-page, var(--mg-accent-ink, var(--mg-accent)));
+	white-space: nowrap;
+}
+.cr-lede {
+	grid-area: lede;
+	max-width: 110ch;
+	padding-left: 18px;
+	border-left: 1px solid var(--mg-border);
+	font-size: var(--cr-fs-meta);
+	line-height: 1.45;
+	color: var(--mg-text-3);
+}
+.cr-lede strong {
+	color: var(--mg-text-2);
+	font-weight: 500;
+}
+.cr-head-acts {
+	grid-area: acts;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 8px 12px;
+}
+.cr-meta {
+	grid-area: meta;
+	justify-self: end;
+	max-width: 40ch;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	font-size: var(--cr-fs-meta);
+	color: var(--mg-text-3);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+.cr-meta:empty {
+	display: none;
+}
+
+/* A slim strip of summary counts, coloured only when meaningful (--stat). */
+.cr-stats {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+	gap: 0;
+	border: 1px solid var(--cr-card-edge);
+	border-radius: var(--mg-r);
+	background: var(--cr-card);
+	overflow: hidden;
+}
+.cr-stat {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	min-width: 0;
+	padding: 8px 16px;
+	border-left: 1px solid var(--cr-card-edge);
+}
+.cr-stat:first-child {
+	border-left: none;
+}
+.cr-stat b {
+	font-size: calc(var(--cr-fs-body) * 1.25);
+	font-weight: 500;
+	line-height: 1.3;
+	font-variant-numeric: tabular-nums;
+	color: var(--stat, var(--mg-text));
+}
+.cr-stat span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: var(--cr-fs-meta);
+	color: var(--mg-text-2);
+}
+.cr-stat .cr-stat-note {
+	font-size: var(--cr-fs-micro);
+	color: var(--mg-text-3);
+}
+
+/* ---------------------------------------------------------------- blocks */
+
+/* Every block is a flat grey panel with no shadow and a named head. */
+.crisp .mg-card,
+.cr-block {
+	border: 1px solid var(--cr-card-edge);
+	border-radius: var(--mg-r);
+	background: var(--cr-card);
+	box-shadow: none;
+	overflow: hidden;
+}
+/* A grey head with plain text; a block's hue shows as a small square (Vivid
+   tints the head). [data-shade] selectors outrank those in workspace.css. */
+.crisp .mg-card-head,
+.crisp [data-shade] > .mg-card-head,
+.cr-block-head {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-height: calc(var(--cr-fs-body) * 3.2);
+	padding: var(--cr-pad);
+	border-bottom: 1px solid var(--mg-border);
+	background: transparent;
+	box-shadow: none;
+	font-size: var(--cr-fs-meta);
+}
+.crisp[data-shades='vivid'] [data-shade] > :is(.mg-card-head, .cr-block-head) {
+	background: color-mix(in srgb, var(--sh) 7%, var(--cr-head-bg));
+}
+.crisp .mg-card-head h2,
+.cr-block-head h2 {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	font-size: var(--cr-fs-section);
+	font-weight: 600;
+	line-height: 1.3;
+	color: var(--cr-t2, var(--mg-text));
+}
+.crisp [data-shade] > :is(.mg-card-head, .cr-block-head) :is(h2, h2 button) {
+	color: var(--cr-t2, var(--mg-text));
+}
+.crisp [data-shade] > :is(.mg-card-head, .cr-block-head) h2::before {
+	content: '';
+	flex-shrink: 0;
+	width: 8px;
+	height: 8px;
+	border-radius: 2px;
+	background: color-mix(in srgb, var(--sh, transparent) var(--sh-rail), transparent);
+}
+.cr-block-body {
+	padding: var(--cr-pad);
+}
+.crisp .mg-page {
+	max-width: none;
+	gap: var(--cr-gutter);
+}
+/* The shared pages put their own cards inside ours; one border is enough. */
+.cr-block .mg-card {
+	border: 0;
+	border-radius: 0;
+}
+
+/* ---------------------------------------------------------------- rows and tables */
+
+.cr-rows {
+	display: flex;
+	flex-direction: column;
+}
+.cr-rows > li + li {
+	border-top: 1px solid var(--cr-rule);
+}
+.cr-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: var(--cr-fs-meta);
+	font-variant-numeric: tabular-nums;
+}
+.cr-table th {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	padding: 8px 16px;
+	border-bottom: 1px solid var(--mg-border-strong);
+	background: var(--cr-head-bg);
+	font-weight: 600;
+	color: var(--mg-text-2);
+	text-align: left;
+	white-space: nowrap;
+}
+.cr-table td {
+	padding: 8px 16px;
+	border-bottom: 1px solid var(--cr-rule);
+}
+.cr-table tbody tr:nth-child(even) td {
+	background: var(--cr-zebra-on);
+}
+.cr-table tbody tr:hover td {
+	background: var(--mg-surface-2);
+}
+.cr-table tbody tr:last-child td {
+	border-bottom: 0;
+}
+.cr-table .num {
+	text-align: right;
+}
+
+/* A state, said in a word and a colour (and with symbols on, a mark too). */
+.cr-tag {
+	display: inline-flex;
+	align-items: center;
+	height: 22px;
+	padding: 0 7px;
+	border-radius: 4px;
+	background: var(--cr-tag-bg);
+	color: var(--mg-text-2);
+	font-size: var(--cr-fs-micro);
+	font-weight: 600;
+	white-space: nowrap;
+}
+.cr-tag.ok {
+	color: var(--mg-ok);
+}
+.cr-tag.warn {
+	color: var(--mg-warn);
+}
+.cr-tag.danger {
+	color: var(--mg-danger);
+}
+.cr-tag.now {
+	color: var(--mg-accent);
+}
+.cr-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	padding: calc(var(--cr-gutter) * 2) var(--cr-gutter);
+	text-align: center;
+	color: var(--mg-text-3);
+	font-size: var(--cr-fs-meta);
+}
+.cr-empty strong {
+	color: var(--mg-text-2);
+	font-size: var(--cr-fs-body);
+	font-weight: 600;
+}
+
+/* Settings rows: the controls line up in a column of their own. */
+.crisp .setting {
+	gap: 8px 20px;
+}
+.crisp .setting .ctl {
+	min-width: 180px;
+	justify-content: flex-end;
+}
+.crisp .setting .text {
+	flex: 1 1 320px;
+}
+
+/* ---------------------------------------------------------------- controls */
+
+/* Plain controls, as the classic pages have them: small rounded corners,
+   flat fills, the accent for the one thing to press. Nothing lifts or glows. */
+.crisp .mg-btn,
+.crisp .mg-seg button {
+	font-size: var(--cr-fs-meta);
+}
+/* Typed text uses the body size and grows with the field-size slider. */
+.crisp .mg-input,
+.crisp .mg-select {
+	font-size: var(--mg-fs-field, var(--cr-fs-body));
+}
+.crisp .mg-btn {
+	height: var(--mg-ctl-sm);
+	padding: 0 14px;
+	border: 1px solid var(--mg-border-strong);
+	border-radius: var(--mg-r-sm);
+	background: var(--mg-surface);
+	box-shadow: none;
+	color: var(--mg-text);
+	font-weight: 500;
+	transition:
+		background-color var(--mo-1) var(--mo-ease),
+		border-color var(--mo-1) var(--mo-ease);
+}
+.crisp .mg-btn.small {
+	height: calc(var(--mg-ctl-sm) - 4px);
+	padding: 0 11px;
+}
+.crisp .mg-btn:not(.primary):hover:not(:disabled) {
+	border-color: var(--mg-text-3);
+	background: var(--mg-surface-2);
+}
+.crisp .mg-btn.primary {
+	border-color: transparent;
+	background: var(--mg-accent);
+	color: var(--mg-on-accent);
+}
+.crisp .mg-btn.primary:not(:disabled):hover {
+	background: color-mix(in srgb, var(--mg-accent) 88%, #000);
+	filter: none;
+}
+.crisp .mg-btn:disabled {
+	opacity: 0.55;
+}
+.crisp .mg-icon-btn {
+	border-radius: var(--mg-r-sm);
+}
+.crisp .mg-input,
+.crisp .mg-select {
+	height: var(--mg-ctl-sm);
+	padding: 0 var(--mg-field-pad, 10px);
+	border: 1px solid var(--mg-border-strong);
+	border-radius: var(--mg-r-sm);
+	background: var(--mg-surface);
+	box-shadow: none;
+	color: var(--mg-text);
+}
+.crisp .mg-input::placeholder {
+	color: var(--mg-text-3);
+}
+.crisp textarea.mg-input {
+	height: auto;
+	padding: 8px 10px;
+}
+.crisp :is(.mg-input, .mg-select):focus {
+	outline: none;
+	border-color: var(--mg-accent);
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--mg-accent) 18%, transparent);
+}
+.crisp :is(.mg-input, .mg-select):disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+/* A segmented choice: joined buttons in one frame, the chosen one filled. */
+.crisp .mg-seg {
+	gap: 0;
+	padding: 0;
+	border: 1px solid var(--mg-border-strong);
+	border-radius: var(--mg-r-sm);
+	background: var(--mg-surface);
+	overflow: hidden;
+}
+.crisp .mg-seg button {
+	height: calc(var(--mg-ctl-sm) - 2px);
+	padding: 0 12px;
+	border-radius: 0;
+	color: var(--mg-text-2);
+	font-weight: 500;
+}
+.crisp .mg-seg button + button {
+	border-left: 1px solid var(--mg-border);
+}
+.crisp .mg-seg button:hover:not(:disabled, [aria-checked='true']) {
+	background: var(--mg-surface-2);
+	color: var(--mg-text);
+}
+.crisp .mg-seg button[aria-checked='true'],
+.crisp .mg-seg > .mo-thumb {
+	background: var(--mg-accent);
+	box-shadow: none;
+}
+.crisp .mg-seg button[aria-checked='true'] {
+	color: var(--mg-on-accent);
+	font-weight: 600;
+}
+.crisp .mg-seg > .mo-thumb {
+	border-radius: 0;
+}
+.crisp .mg-seg.mo-has-thumb button[aria-checked='true'] {
+	background: transparent;
+}
+.crisp .mg-switch {
+	width: 36px;
+	height: 20px;
+	padding: 2px;
+	background: color-mix(in srgb, var(--mg-text) 22%, var(--mg-surface));
+	box-shadow: none;
+}
+.crisp .mg-switch[aria-checked='true'] {
+	background: var(--mg-accent);
+}
+.crisp .mg-switch::after {
+	width: 16px;
+	height: 16px;
+	background: #fff;
+	box-shadow: none;
+}
+.crisp .mg-switch[aria-checked='true']::after {
+	transform: translateX(16px);
+}
+.crisp :where(input[type='checkbox'], input[type='radio'], input[type='range'], progress) {
+	accent-color: var(--mg-accent);
+}
+.crisp :where(input[type='checkbox'], input[type='radio']) {
+	width: 15px;
+	height: 15px;
+	cursor: pointer;
+}
+.crisp .mg-radio {
+	width: 16px;
+	height: 16px;
+	border-width: 1.5px;
+}
+.crisp [aria-checked='true'] > .mg-radio {
+	border-width: 5px;
+}
+.crisp {
+	scrollbar-color: color-mix(in srgb, var(--mg-text) 22%, transparent) transparent;
+}
+.crisp :where(.rows, .list) > li {
+	padding-top: 3px;
+	padding-bottom: 3px;
+}
+
+/* ---------------------------------------------------------------- shared parts, in Crisp's sizes */
+
+.crisp .mg-note {
+	font-size: var(--cr-fs-meta);
+	line-height: 1.5;
+}
+.crisp .mg-label {
+	font-size: var(--cr-fs-meta);
+	font-weight: 500;
+	color: var(--cr-t4, var(--mg-text-2));
+}
+.crisp .mg-link {
+	color: var(--mg-accent-ink);
+	font-weight: 500;
+}
+.crisp .mg-link.quiet {
+	color: var(--mg-text-2);
+}
+.crisp .mg-link:hover {
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+/* The readiness line, when all is well: just a line of text. */
+.crisp .cr-page > p.line {
+	align-self: flex-start;
+}
+.crisp .mg-bar {
+	height: 5px;
+	border-radius: 3px;
+	background: color-mix(in srgb, var(--mg-text) 10%, transparent);
+}
+.crisp .mg-bar > div {
+	border-radius: 3px;
+	background: var(--mg-accent);
+}
+
+/* ---------------------------------------------------------------- panels of settings */
+
+/* A small card of related settings: a caption with an accent dot, then the controls. */
+.cr-group {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	min-width: 0;
+	padding: 16px;
+	border-radius: var(--mg-r);
+	background: var(--cr-card, var(--mg-surface));
+}
+.cr-group-title {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: var(--cr-fs-micro);
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--mg-text-3);
+}
+.cr-group-title::before {
+	content: '';
+	flex: none;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--mg-accent-base, var(--mg-accent));
+}
+.cr-group-title :is(small, .cr-group-aside) {
+	margin-left: auto;
+	font-size: var(--cr-fs-micro);
+	font-weight: 500;
+	letter-spacing: 0;
+	text-transform: none;
+	color: var(--mg-text-3);
+}
+
+@media (max-width: 720px) {
+	.cr-page {
+		padding: 16px 14px 48px;
+		gap: 16px;
+	}
+	.cr-head {
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-areas: 'title' 'lede' 'meta' 'acts';
+	}
+	.cr-lede {
+		padding-left: 0;
+		border-left: none;
+	}
+	.cr-meta {
+		justify-self: start;
+		max-width: 100%;
+	}
+	.cr-head-acts {
+		justify-content: flex-start;
+	}
+	.cr-stats {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 10px;
+	}
+	.cr-table {
+		display: block;
+		overflow-x: auto;
+	}
+}
+
+/* ---------------------------------------------------------------- titles by rank
+
+   Headings take accent shades by rank (theme.ts): block titles --cr-t2,
+   section labels and column heads --cr-t3, field labels --cr-t4. The "html"
+   prefix lets these outrank the components' scoped rules. */
+html .crisp.crisp :is(.mo-fold-title, .gb-colhead, .xhead h2, .ghead, .sp-head h2, .rb-methods h3, .gc-setup h3, .wf-group h4, .sb-subhead, .sb-here-t, .sb-title, .rd-title, .rb-title, .rl-title, .gc-title, .sec-head) {
+	color: var(--cr-t2);
+}
+html .crisp.crisp :is(.cr-group-title, .cr-table th, .phases th, .sb-th, .sb-sub, .rb-show-l, .lbl, .tm-label, .fb-places h2, .fv-cols) {
+	color: var(--cr-t3);
+}
+html .crisp.crisp :is(.field-title, .mg-field > .mg-label, label.mg-label, .sb-tile-name, .sb-lbl, .rb-label, .stage-name) {
+	color: var(--cr-t4);
+}
+/* Fields: a hairline of the accent round what can be typed in or picked. */
+html .crisp.crisp :is(.mg-input, .mg-select, .mg-textarea, .vw-field) {
+	border-color: var(--cr-field-edge);
+}
+/* The head of every block, washed with the accent as much as Colour says. */
+html .crisp.crisp :is(.mg-card-head, .cr-block-head) {
+	background-color: var(--cr-head-wash);
+}

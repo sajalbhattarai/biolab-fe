@@ -1,0 +1,87 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# dbcan — apptainer recipe (hand-translated from Dockerfile)
+# Carbohydrate-active enzyme annotation (HMMER + DIAMOND + dbCAN-sub).
+# Two-stage build: DIAMOND from source; HMMER installed via apt in runtime.
+# install run_dbcan from PyPI with pinned versions on python:3.11-slim.
+# See LICENSE.md for license terms.
+# ──────────────────────────────────────────────────────────────────────────────
+
+# ── stage 1: DIAMOND builder ────────────────────────────────────────────────
+Bootstrap: docker
+From: debian:12-slim
+Stage: diamond_builder
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    DIAMOND_VERSION=2.1.9
+
+    apt-get update && apt-get install -y --no-install-recommends \
+            build-essential cmake ca-certificates wget zlib1g-dev \
+     && rm -rf /var/lib/apt/lists/*
+
+    cd /tmp \
+     && wget -q "https://github.com/bbuchfink/diamond/archive/refs/tags/v${DIAMOND_VERSION}.tar.gz" \
+     && tar -xzf "v${DIAMOND_VERSION}.tar.gz" \
+     && cd "diamond-${DIAMOND_VERSION}" \
+     && mkdir -p build && cd build \
+     && cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local .. \
+     && make -j4 && make install
+
+# ── stage 2: runtime ────────────────────────────────────────────────────────
+Bootstrap: docker
+From: python:3.11-slim
+
+%files
+    entrypoint.sh /opt/dbcan/entrypoint.sh
+    scripts      /opt/dbcan/
+    LICENSE.md    /opt/dbcan/LICENSE.md
+    VERSIONS      /opt/dbcan/VERSIONS
+
+%files from diamond_builder
+    /usr/local/bin/diamond  /usr/local/bin/diamond
+
+%labels
+    org.opencontainers.image.title         dbcan
+    org.opencontainers.image.description   "run_dbcan v5 (HMMER + DIAMOND + dbCAN-sub) — from-source binaries, pinned pip versions"
+    org.opencontainers.image.source        https://github.com/sajalbhattarai/containers
+    org.opencontainers.image.vendor        margie-annotation
+    org.opencontainers.image.licenses      GPL-3.0-or-later
+    org.opencontainers.image.version       dbcan-5.1.2
+
+%environment
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+
+    HMMER_VERSION=3.3.2
+    DIAMOND_VERSION=2.1.9
+    DBCAN_VERSION=5.1.2
+    PYRODIGAL_VERSION=3.6.3
+
+    apt-get update && apt-get install -y --no-install-recommends \
+            tini bash ca-certificates zlib1g libgomp1 hmmer \
+     && rm -rf /var/lib/apt/lists/*
+
+    # run_dbcan from PyPI with pinned versions
+    pip install --no-cache-dir \
+            "dbcan==${DBCAN_VERSION}" \
+            "pyrodigal==${PYRODIGAL_VERSION}"
+
+    chmod -R a+rX /opt/dbcan \
+     && find /opt/dbcan -type f \( -name '*.sh' -o -name '*.py' \) -exec chmod a+x {} + \
+     && ln -sf /opt/dbcan/entrypoint.sh /usr/local/bin/run \
+     && mkdir -p /input /output /db
+
+    printf '{\n  "tool": "dbcan",\n  "hmmer_version": "%s",\n  "diamond_version": "%s",\n  "dbcan_version": "%s",\n  "pyrodigal_version": "%s",\n  "base_image": "python:3.11-slim",\n  "build_date": "%s"\n}\n' \
+            "${HMMER_VERSION}" "${DIAMOND_VERSION}" "${DBCAN_VERSION}" "${PYRODIGAL_VERSION}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            > /etc/pipeline-build.json
+
+%runscript
+    exec /usr/bin/tini -- /usr/local/bin/run "$@"

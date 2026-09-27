@@ -1,0 +1,176 @@
+/* Maps Skeleton classes (bg-surface-100, text-primary-500, btn, card...) used
+   by the older pages inside LegacyShell onto MARGIE's theme colours. Skeleton's
+   scale runs 50 to 950: page to ink in light mode, ink to page in dark mode. */
+.cr-legacy {
+	--lg-light: var(--mg-bg);
+	--lg-dark: var(--mg-text);
+	--color-surface-50: color-mix(in srgb, var(--lg-dark) 2%, var(--lg-light));
+	--color-surface-100: color-mix(in srgb, var(--lg-dark) 5%, var(--lg-light));
+	--color-surface-200: color-mix(in srgb, var(--lg-dark) 10%, var(--lg-light));
+	--color-surface-300: color-mix(in srgb, var(--lg-dark) 20%, var(--lg-light));
+	--color-surface-400: color-mix(in srgb, var(--lg-dark) 35%, var(--lg-light));
+	--color-surface-500: color-mix(in srgb, var(--lg-dark) 50%, var(--lg-light));
+	--color-surface-600: color-mix(in srgb, var(--lg-dark) 64%, var(--lg-light));
+	--color-surface-700: color-mix(in srgb, var(--lg-dark) 78%, var(--lg-light));
+	--color-surface-800: color-mix(in srgb, var(--lg-dark) 90%, var(--lg-light));
+	--color-surface-900: color-mix(in srgb, var(--lg-dark) 95%, var(--lg-light));
+	--color-surface-950: color-mix(in srgb, var(--lg-dark) 98%, var(--lg-light));
+
+	--color-primary-50: color-mix(in srgb, var(--mg-accent) 8%, #fff);
+	--color-primary-100: color-mix(in srgb, var(--mg-accent) 16%, #fff);
+	--color-primary-200: color-mix(in srgb, var(--mg-accent) 32%, #fff);
+	--color-primary-300: color-mix(in srgb, var(--mg-accent) 52%, #fff);
+	--color-primary-400: color-mix(in srgb, var(--mg-accent) 76%, #fff);
+	--color-primary-500: var(--mg-accent);
+	--color-primary-600: color-mix(in srgb, var(--mg-accent) 86%, #000);
+	--color-primary-700: color-mix(in srgb, var(--mg-accent) 72%, #000);
+	--color-primary-800: color-mix(in srgb, var(--mg-accent) 58%, #000);
+	--color-primary-900: color-mix(in srgb, var(--mg-accent) 44%, #000);
+	--color-primary-950: color-mix(in srgb, var(--mg-accent) 30%, #000);
+	--color-primary-contrast-500: var(--mg-on-accent);
+	--color-primary-contrast-600: var(--mg-on-accent);
+	--color-primary-contrast-light: var(--mg-on-accent);
+	--color-primary-contrast-dark: var(--mg-on-accent);
+
+	/* Their other brand colours are the accent too: one colour for emphasis. */
+	--color-secondary-50: var(--color-primary-50);
+	--color-secondary-100: var(--color-primary-100);
+	--color-secondary-200: var(--color-primary-200);
+	--color-secondary-300: var(--color-primary-300);
+	--color-secondary-400: var(--color-primary-400);
+	--color-secondary-500: var(--color-primary-500);
+	--color-secondary-600: var(--color-primary-600);
+	--color-secondary-700: var(--color-primary-700);
+	--color-secondary-800: var(--color-primary-800);
+	--color-secondary-900: var(--color-primary-900);
+	--color-secondary-950: var(--color-primary-950);
+	--color-tertiary-50: var(--color-primary-50);
+	--color-tertiary-100: var(--color-primary-100);
+	--color-tertiary-200: var(--color-primary-200);
+	--color-tertiary-300: var(--color-primary-300);
+	--color-tertiary-400: var(--color-primary-400);
+	--color-tertiary-500: var(--color-primary-500);
+	--color-tertiary-600: var(--color-primary-600);
+	--color-tertiary-700: var(--color-primary-700);
+	--color-tertiary-800: var(--color-primary-800);
+	--color-tertiary-900: var(--color-primary-900);
+	--color-tertiary-950: var(--color-primary-950);
+
+	--base-font-family: var(--mg-font);
+	--heading-font-family: var(--mg-font);
+	--anchor-font-color: var(--mg-accent-ink, var(--mg-accent));
+	--anchor-font-color-dark: var(--mg-accent-ink, var(--mg-accent));
+
+	color: var(--mg-text);
+	font-family: var(--mg-font);
+}
+.cr-legacy[data-theme='dark'] {
+	--lg-light: var(--mg-text);
+	--lg-dark: var(--mg-bg);
+}
+/* In dark mode "dark:bg-surface-800" is a panel: a little lighter than the page. */
+.cr-legacy[data-theme='dark'] {
+	--color-surface-700: color-mix(in srgb, var(--lg-dark) 82%, var(--lg-light));
+	--color-surface-800: color-mix(in srgb, var(--lg-dark) 91%, var(--lg-light));
+	--color-surface-900: color-mix(in srgb, var(--lg-dark) 95%, var(--lg-light));
+}
+
+/* Their frames and cards: flat panels, as MARGIE's are. */
+.cr-legacy .legacy-page {
+	display: block;
+}
+.cr-legacy :where(.app-page-frame, .glass-card, .card) {
+	border-color: var(--cr-card-edge);
+	box-shadow: none;
+	backdrop-filter: none;
+}
+.cr-legacy .card {
+	border-radius: var(--mg-r);
+}
+.cr-legacy :is(h1, h2, h3).text-primary-500 {
+	color: var(--mg-accent-ink, var(--mg-accent));
+}
+.cr-legacy :where(.btn, .btn-icon, .input, .select, .textarea, .chip, .badge) {
+	border-radius: var(--mg-r-sm);
+}
+.cr-legacy :where(.input, .select, .textarea) {
+	border-color: var(--mg-border-strong);
+	background: var(--mg-surface);
+	color: var(--mg-text);
+}
+/* No page animations. */
+.cr-legacy :where(.app-fade-in, .app-pop-in) {
+	animation: none;
+}
+.cr-legacy .beta-strip,
+.cr-legacy .hero-button {
+	background: var(--cr-card);
+	border-color: var(--cr-card-edge);
+	color: var(--mg-text);
+}
+.cr-legacy .hero-button {
+	background: var(--mg-accent);
+	color: var(--mg-on-accent);
+}
+
+/* Skeleton 2 "variant-*" buttons, missing from the installed Skeleton, drawn
+   as MARGIE's buttons: filled for the primary action, outlined otherwise. */
+.cr-legacy :is(.btn, .btn-icon) {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	min-height: var(--mg-ctl-sm);
+	padding: 0 14px;
+	border: 1px solid var(--mg-border-strong);
+	border-radius: var(--mg-r-sm);
+	background: var(--mg-surface);
+	color: var(--mg-text);
+	font-weight: 500;
+	cursor: pointer;
+}
+.cr-legacy .btn-icon {
+	padding: 0;
+	width: var(--mg-ctl-sm);
+	border-color: transparent;
+	background: transparent;
+}
+.cr-legacy :is(.btn, .btn-icon):hover:not(:disabled) {
+	background: var(--mg-surface-2);
+}
+.cr-legacy :is(.btn, .btn-icon):disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+.cr-legacy .btn:is(.variant-filled-primary, .variant-filled-secondary, .preset-filled-primary-500) {
+	border-color: transparent;
+	background: var(--mg-accent);
+	color: var(--mg-on-accent);
+}
+.cr-legacy .btn:is(.variant-filled-primary, .variant-filled-secondary, .preset-filled-primary-500):hover:not(:disabled) {
+	background: color-mix(in srgb, var(--mg-accent) 88%, #000);
+}
+.cr-legacy .btn.variant-filled-success {
+	border-color: transparent;
+	background: var(--mg-ok);
+	color: #fff;
+}
+.cr-legacy .btn.variant-filled-warning {
+	border-color: transparent;
+	background: var(--mg-warn);
+	color: #fff;
+}
+.cr-legacy .btn.variant-filled-error {
+	border-color: transparent;
+	background: var(--mg-danger);
+	color: #fff;
+}
+.cr-legacy .btn:is(.variant-ghost-primary, .variant-outline-primary) {
+	border-color: var(--mg-accent);
+	background: transparent;
+	color: var(--mg-accent-ink, var(--mg-accent));
+}
+.cr-legacy .btn:is(.variant-soft, .variant-ghost-surface) {
+	border-color: transparent;
+	background: var(--mg-surface-2);
+}

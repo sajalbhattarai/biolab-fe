@@ -1,0 +1,45 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# geneprop — apptainer recipe (hand-translated from Dockerfile)
+# EBI Genome Properties evaluator (pure-python over flatfiles)
+# Source:  https://github.com/ebi-pf-team/genome-properties  (mounted at /db)
+# condaforge/miniforge3 base + conda install pandas. Local elaboration adds scripts/.
+# ──────────────────────────────────────────────────────────────────────────────
+
+Bootstrap: docker
+From: condaforge/miniforge3:latest
+
+%files
+    entrypoint.sh /opt/geneprop/entrypoint.sh
+    scripts      /opt/geneprop/
+    LICENSE.md    /opt/geneprop/LICENSE.md
+    VERSIONS      /opt/geneprop/VERSIONS
+
+%labels
+    org.opencontainers.image.title         geneprop
+    org.opencontainers.image.description   "EBI Genome Properties evaluator (upstream miniforge3 base)"
+    org.opencontainers.image.source        https://github.com/sajalbhattarai/containers
+    org.opencontainers.image.licenses      Apache-2.0
+
+%environment
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+    export PYTHONDONTWRITEBYTECODE=1
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+    export PYTHONDONTWRITEBYTECODE=1
+
+    conda install -y -c conda-forge -c bioconda python=3.11 pandas \
+     && conda clean -afy
+
+    chmod -R a+rX /opt/geneprop \
+     && find /opt/geneprop -type f \( -name '*.sh' -o -name '*.py' \) -exec chmod a+x {} + \
+     && ln -sf /opt/geneprop/entrypoint.sh /usr/local/bin/run \
+     && mkdir -p /input /output /db
+
+%runscript
+    exec /usr/local/bin/run "$@"

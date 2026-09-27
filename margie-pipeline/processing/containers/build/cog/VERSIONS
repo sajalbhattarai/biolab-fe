@@ -1,0 +1,8 @@
+BLAST_VERSION=2.16.0
+BLAST_SOURCE=https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.16.0/ncbi-blast-2.16.0+-x64-linux.tar.gz
+COGCLASSIFIER_VERSION=2.0.0
+COGCLASSIFIER_SOURCE=https://pypi.org/project/cogclassifier/2.0.0/
+COG_RELEASE=2024 (NCBI CDD COG_LE)
+COG_SOURCE=https://ftp.ncbi.nlm.nih.gov/pub/COG/COG2024/data/
+BASE_IMAGE=python:3.11-slim
+PLATFORM=linux/amd64

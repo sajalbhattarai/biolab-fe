@@ -1,0 +1,80 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# pfam — apptainer recipe (hand-translated from Dockerfile)
+# HMMER hmmscan against Pfam-A. Built from source for reproducibility.
+# Two-stage build: builder compiles HMMER, runtime ships only the binaries.
+# See LICENSE.md for license terms (HMMER: BSD-3, Pfam-A: CC0).
+# ──────────────────────────────────────────────────────────────────────────────
+
+Bootstrap: docker
+From: debian:12-slim
+Stage: builder
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    HMMER_VERSION=3.4
+
+    apt-get update && apt-get install -y --no-install-recommends \
+            build-essential ca-certificates wget \
+     && rm -rf /var/lib/apt/lists/*
+
+    cd /tmp \
+     && wget -q "http://eddylab.org/software/hmmer/hmmer-${HMMER_VERSION}.tar.gz" \
+     && tar -xzf "hmmer-${HMMER_VERSION}.tar.gz" \
+     && cd "hmmer-${HMMER_VERSION}" \
+     && ./configure --prefix=/usr/local \
+     && make -j"$(nproc)" \
+     && make install \
+     && cd / && rm -rf /tmp/hmmer-*
+
+Bootstrap: docker
+From: debian:12-slim
+
+%files
+    entrypoint.sh /opt/pfam/entrypoint.sh
+    scripts/pipeline_log.sh            /opt/pfam/scripts/pipeline_log.sh
+    scripts/process_pfam_raw_results.py /opt/pfam/scripts/process_pfam_raw_results.py
+    LICENSE.md    /opt/pfam/LICENSE.md
+    VERSIONS      /opt/pfam/VERSIONS
+
+%files from builder
+    /usr/local/bin/hmmscan  /usr/local/bin/hmmscan
+    /usr/local/bin/hmmpress /usr/local/bin/hmmpress
+    /usr/local/bin/hmmstat  /usr/local/bin/hmmstat
+
+%labels
+    org.opencontainers.image.title         pfam
+    org.opencontainers.image.description   "HMMER hmmscan against Pfam-A (from-source build)"
+    org.opencontainers.image.source        https://github.com/sajalbhattarai/containers
+    org.opencontainers.image.vendor        margie-annotation
+    org.opencontainers.image.licenses      "BSD-3-Clause AND CC0-1.0"
+    org.opencontainers.image.version       hmmer-3.4
+
+%environment
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+
+    HMMER_VERSION=3.4
+
+    apt-get update && apt-get install -y --no-install-recommends \
+            python3 tini bash ca-certificates \
+     && rm -rf /var/lib/apt/lists/*
+
+    chmod -R a+rX /opt/pfam \
+     && find /opt/pfam -type f \( -name '*.sh' -o -name '*.py' \) -exec chmod a+x {} + \
+     && ln -sf /opt/pfam/entrypoint.sh /usr/local/bin/run \
+     && mkdir -p /input /output /db
+
+    printf '{\n  "tool": "pfam",\n  "hmmer_version": "%s",\n  "base_image": "debian:12-slim",\n  "build_date": "%s"\n}\n' \
+            "${HMMER_VERSION}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            > /etc/pipeline-build.json
+
+%runscript
+    exec /usr/bin/tini -- /usr/local/bin/run "$@"

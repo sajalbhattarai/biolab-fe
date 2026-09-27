@@ -1,0 +1,36 @@
+Bootstrap: docker
+From: python:3.11-slim
+
+%files
+    entrypoint.sh /opt/envelope/entrypoint.sh
+    scripts /opt/envelope/scripts
+
+%labels
+    org.opencontainers.image.title envelope
+    org.opencontainers.image.description "Envelope-type inference from upstream annotation descriptors"
+    org.opencontainers.image.source https://github.com/sajalbhattarai/containers
+    org.opencontainers.image.licenses BSD-3-Clause
+
+%environment
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+    export PYTHONDONTWRITEBYTECODE=1
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y --no-install-recommends bash ca-certificates
+    rm -rf /var/lib/apt/lists/*
+
+    chmod -R a+rX /opt/envelope
+    find /opt/envelope -type f \( -name '*.sh' -o -name '*.py' \) -exec chmod a+x {} +
+
+    printf '#!/usr/bin/env bash\nexec /opt/envelope/entrypoint.sh "$@"\n' > /usr/local/bin/run
+    printf '#!/usr/bin/env bash\nexec /usr/local/bin/run "$@"\n' > /usr/local/bin/margie_run
+    chmod +x /usr/local/bin/run /usr/local/bin/margie_run
+
+    mkdir -p /input /output
+
+%runscript
+    exec /usr/local/bin/run "$@"

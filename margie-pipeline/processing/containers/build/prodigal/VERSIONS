@@ -1,0 +1,5 @@
+# Pinned upstream versions baked into this image.
+# Reviewers: `docker run --rm <image> cat /opt/prodigal/VERSIONS`
+PRODIGAL_VERSION=2.6.3
+PRODIGAL_SOURCE=https://github.com/hyattpd/Prodigal/archive/refs/tags/v2.6.3.tar.gz
+BASE_IMAGE=debian:12-slim

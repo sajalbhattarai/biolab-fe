@@ -1,0 +1,7 @@
+# Pinned upstream versions baked into this image.
+# Reviewers: `docker run --rm <image> cat /opt/pfam/VERSIONS`
+HMMER_VERSION=3.4
+HMMER_SOURCE=http://eddylab.org/software/hmmer/hmmer-3.4.tar.gz
+PFAM_A_RELEASE=37.0
+PFAM_A_SOURCE=https://ftp.ebi.ac.uk/pub/databases/Pfam/releases/Pfam37.0/Pfam-A.hmm.gz
+BASE_IMAGE=debian:12-slim

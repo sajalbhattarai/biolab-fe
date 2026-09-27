@@ -1,0 +1,5 @@
+tool=rasttk
+base_image=ubuntu:22.04
+upstream_cli=https://github.com/BV-BRC/BV-BRC-CLI/releases/tag/1.040
+upstream_pkg=bvbrc-cli-1.040.deb
+license=GPL-3.0-or-later

@@ -1,0 +1,82 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# eggnog — apptainer recipe (hand-translated from Dockerfile)
+# Orthology assignment via eggNOG-mapper.
+# Uses pre-compiled HMMER + DIAMOND Linux binaries; installs eggnog-mapper
+# from PyPI with pinned version.
+# See LICENSE.md for license terms (AGPL-3.0 — networked-use clause applies).
+# ──────────────────────────────────────────────────────────────────────────────
+
+Bootstrap: docker
+From: python:3.11-slim
+
+%files
+    entrypoint.sh /opt/eggnog/entrypoint.sh
+    scripts/pipeline_log.sh             /opt/eggnog/scripts/pipeline_log.sh
+    scripts/process_eggnog_raw_results.py /opt/eggnog/scripts/process_eggnog_raw_results.py
+    LICENSE.md    /opt/eggnog/LICENSE.md
+    VERSIONS      /opt/eggnog/VERSIONS
+
+%labels
+    org.opencontainers.image.title         eggnog
+    org.opencontainers.image.description   "eggNOG-mapper (HMMER + DIAMOND pre-built binaries, pinned pip version)"
+    org.opencontainers.image.source        https://github.com/sajalbhattarai/containers
+    org.opencontainers.image.vendor        margie-annotation
+    org.opencontainers.image.licenses      AGPL-3.0-or-later
+    org.opencontainers.image.version       eggnog-mapper-2.1.12
+
+%environment
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+
+    HMMER_VERSION=3.4
+    DIAMOND_VERSION=2.1.9
+    EGGNOG_MAPPER_VERSION=2.1.12
+
+    apt-get update && apt-get install -y --no-install-recommends \
+            tini bash ca-certificates wget zlib1g libgomp1 \
+     && rm -rf /var/lib/apt/lists/*
+
+    # Install HMMER pre-compiled Linux binary
+    cd /tmp \
+     && wget -q "http://eddylab.org/software/hmmer/hmmer-${HMMER_VERSION}-linux-intel-x86_64.tar.gz" \
+     && tar -xzf "hmmer-${HMMER_VERSION}-linux-intel-x86_64.tar.gz" \
+     && cp "hmmer-${HMMER_VERSION}-linux-intel-x86_64/binaries/hmmscan"  /usr/local/bin/hmmscan \
+     && cp "hmmer-${HMMER_VERSION}-linux-intel-x86_64/binaries/hmmpress" /usr/local/bin/hmmpress \
+     && chmod +x /usr/local/bin/hmmscan /usr/local/bin/hmmpress \
+     && rm -rf "hmmer-${HMMER_VERSION}-linux-intel-x86_64" "hmmer-${HMMER_VERSION}-linux-intel-x86_64.tar.gz"
+
+    # Install DIAMOND pre-compiled Linux binary
+    cd /tmp \
+     && wget -q "https://github.com/bbuchfink/diamond/releases/download/v${DIAMOND_VERSION}/diamond-linux64.tar.gz" \
+     && tar -xzf diamond-linux64.tar.gz \
+     && mv diamond /usr/local/bin/diamond \
+     && chmod +x /usr/local/bin/diamond \
+     && rm -f diamond-linux64.tar.gz
+
+    # eggnog-mapper 2.1.12 transitively pins biopython==1.76 and psutil==5.7.0.
+    # Neither has aarch64 wheels and biopython 1.76 sources won't compile against
+    # modern gcc (Bio/triemodule.c uses pre-C99 lvalue syntax). Install newer
+    # biopython + psutil first (they have aarch64 wheels), then install
+    # eggnog-mapper with --no-deps + the few remaining runtime deps explicitly.
+    pip install --no-cache-dir \
+            "biopython>=1.79" "psutil>=5.9" "xlsxwriter" "requests" \
+     && pip install --no-cache-dir --no-deps "eggnog-mapper==${EGGNOG_MAPPER_VERSION}"
+
+    chmod -R a+rX /opt/eggnog \
+     && find /opt/eggnog -type f \( -name '*.sh' -o -name '*.py' \) -exec chmod a+x {} + \
+     && ln -sf /opt/eggnog/entrypoint.sh /usr/local/bin/run \
+     && mkdir -p /input /output /db
+
+    printf '{\n  "tool": "eggnog",\n  "eggnog_mapper_version": "%s",\n  "hmmer_version": "%s",\n  "diamond_version": "%s",\n  "base_image": "python:3.11-slim",\n  "build_date": "%s"\n}\n' \
+            "${EGGNOG_MAPPER_VERSION}" "${HMMER_VERSION}" "${DIAMOND_VERSION}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            > /etc/pipeline-build.json
+
+%runscript
+    exec /usr/bin/tini -- /usr/local/bin/run "$@"

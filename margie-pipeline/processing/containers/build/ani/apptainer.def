@@ -1,0 +1,58 @@
+Bootstrap: docker
+From: python:3.11-slim
+
+%files
+    entrypoint.sh /opt/ani/entrypoint.sh
+    scripts      /opt/ani/
+    LICENSE.md    /opt/ani/LICENSE.md
+    VERSIONS      /opt/ani/VERSIONS
+
+%labels
+    org.opencontainers.image.title       ani
+    org.opencontainers.image.description "Average Nucleotide Identity via FastANI (all-vs-all)"
+    org.opencontainers.image.source      https://github.com/sajalbhattarai/margie-pipeline
+    org.opencontainers.image.vendor      margie-annotation
+    org.opencontainers.image.licenses    Apache-2.0
+    org.opencontainers.image.version     fastani-1.34
+
+%environment
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    FASTANI_VERSION=1.34
+
+    apt-get update && apt-get install -y --no-install-recommends \
+            tini bash ca-certificates wget zlib1g \
+            build-essential autoconf automake libtool \
+            libboost-all-dev libgsl-dev \
+     && rm -rf /var/lib/apt/lists/*
+
+    # Compile FastANI from source (autoconf build system)
+    cd /tmp \
+     && wget -q "https://github.com/ParBLiSS/FastANI/archive/refs/tags/v${FASTANI_VERSION}.tar.gz" \
+     && tar -xzf "v${FASTANI_VERSION}.tar.gz" \
+     && cd "FastANI-${FASTANI_VERSION}" \
+     && ./bootstrap.sh \
+     && ./configure --prefix=/usr/local \
+     && make -j"$(nproc)" \
+     && make install \
+     && strip /usr/local/bin/fastANI \
+     && cd / && rm -rf /tmp/FastANI-* /tmp/v${FASTANI_VERSION}.tar.gz
+
+    chmod -R a+rX /opt/ani \
+     && find /opt/ani -type f \( -name '*.sh' -o -name '*.py' \) -exec chmod a+x {} + \
+     && ln -sf /opt/ani/entrypoint.sh /usr/local/bin/run \
+     && mkdir -p /input /output
+
+    printf '{\n  "tool": "ani",\n  "fastani_version": "%s",\n  "base_image": "python:3.11-slim"\n}\n' \
+        "${FASTANI_VERSION}" > /etc/pipeline-build.json
+
+    # Remove build-only packages
+    apt-get purge -y build-essential autoconf automake libtool && apt-get autoremove -y
+
+%runscript
+    exec /usr/local/bin/run "$@"

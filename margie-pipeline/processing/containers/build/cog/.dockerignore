@@ -1,0 +1,8 @@
+meta/
+context/etc/
+context/root/
+context/usr/
+context/var/
+**/__pycache__/
+**/*.pyc
+.DS_Store

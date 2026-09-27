@@ -1,0 +1,16 @@
+node_modules/
+
+# `npm run stage` builds these from margie-fe.
+.stage/
+
+# electron-builder output: the .app and the .dmg.
+dist/
+
+# `npm run icon` draws these from scripts/make-icon.mjs.
+build/icon.icns
+build/icon.png
+build/icon.ico
+build/icon.iconset/
+
+.DS_Store
+*.log

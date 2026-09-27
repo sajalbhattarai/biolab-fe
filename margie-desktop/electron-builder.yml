@@ -1,0 +1,145 @@
+appId: io.github.sajalbhattarai.margie
+productName: MARGIE
+copyright: Copyright © 2026 Sajal Bhattarai
+
+directories:
+  output: dist
+  buildResources: build
+
+# Only the shell itself goes inside the asar. The front-end is extraResources
+# below, deliberately: scripts/hpc-connect.sh is spawned by path and has to be
+# a real file on disk with its exec bit, which an archive member is not.
+files:
+  - src/**/*
+  - package.json
+  - '!**/.DS_Store'
+
+# Listed one directory at a time on purpose.
+#
+# Pointing a single entry at .stage/gui silently drops node_modules:
+# electron-builder excludes it from extraResources whatever filter is given,
+# on the assumption that app dependencies are its job rather than yours. The
+# bundle then ships build/ and scripts/ but none of the packages the built
+# server still imports at runtime -- exceljs among them -- and the app fails
+# only later, on whichever page first needs one. Naming the folder directly
+# is the one form that copies it.
+extraResources:
+  - from: .stage/gui/build
+    to: gui/build
+  - from: .stage/gui/scripts
+    to: gui/scripts
+  - from: .stage/gui/node_modules
+    to: gui/node_modules
+  - from: .stage/gui/package.json
+    to: gui/package.json
+  # margie-pipeline's code, for "this computer" (scripts/stage.mjs); the app
+  # copies it out to Application Support, where it can write (src/pipeline.js).
+  - from: .stage/pipeline
+    to: pipeline
+
+asar: true
+
+mac:
+  category: public.app-category.education
+  icon: build/icon.icns
+  # Hardened runtime is required for notarization; the sandbox is deliberately
+  # not enabled (see build/entitlements.mac.plist for why).
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  # Ad-hoc sign when there is no Developer ID.
+  #
+  # Skipping signing altogether leaves the app carrying Electron's own
+  # linker-signed ad-hoc signature, which no longer matches once the bundle
+  # has Resources/gui added to it -- `codesign --verify` then fails with
+  # "code has no resources but signature indicates they must be present".
+  # It happens to launch anyway on a machine that built it, and is exactly
+  # the sort of thing that only breaks on someone else's.
+  #
+  # For a release, override with the real certificate:
+  #   npm run dist -- --config.mac.identity="Developer ID Application: NAME (TEAMID)" \
+  #                   --config.mac.notarize=true
+  identity: '-'
+  # Off by default so an unsigned build works on this machine. The signed
+  # release build turns it on: see `npm run release` in README.md.
+  notarize: false
+  # One DMG that runs natively on Apple silicon and on Intel Macs. Two DMGs
+  # (arm64, x64) let an Apple silicon Mac end up with the Intel one, which
+  # runs under Rosetta -- slower, and macOS warns it will not be supported.
+  target:
+    - target: dmg
+      arch:
+        - universal
+  extendInfo:
+    NSHighResolutionCapable: true
+    # The app never asks for these itself, but a child process might: ssh
+    # reading a key off an external volume, or results written to a NAS.
+    # Without a usage string macOS kills the app instead of prompting.
+    NSDesktopFolderUsageDescription: MARGIE needs access to read genome files and write results you keep on your Desktop.
+    NSDocumentsFolderUsageDescription: MARGIE needs access to read genome files and write results you keep in Documents.
+    NSDownloadsFolderUsageDescription: MARGIE needs access to read genome files you have downloaded.
+    NSRemovableVolumesUsageDescription: MARGIE needs access to read genome files and write results on external drives.
+    NSNetworkVolumesUsageDescription: MARGIE needs access to read genome files and write results on network drives.
+
+# Double-clicking a genome in Finder opens it in MARGIE, which copies it into
+# the genome folder. `role: Viewer` rather than Editor: MARGIE never writes
+# back to the file it was given.
+fileAssociations:
+  - ext: [fna, fa, fasta, fas, ffn]
+    name: Genome sequence
+    description: FASTA genome sequence
+    role: Viewer
+    rank: Alternate
+    icon: build/icon.icns
+
+# Windows.
+#
+# HPC mode only: the connection runs in Git for Windows' bash, and local mode
+# (the pipeline needs Linux) is not offered there yet. See README.md, Windows.
+#
+# Build it on Windows (`npm run dist:win`): the web app's build tools are
+# native per platform.
+win:
+  # An installer for ordinary (x64) PCs, and a zip for both kinds.
+  #
+  # No installer for Windows on ARM: the NSIS installer is an x86 program, and
+  # run under emulation there (tried on Windows 11 ARM in Parallels, 2026-09-23)
+  # its unpacking drops MARGIE.exe and every DLL -- the 7z method's copy step
+  # fails on them, and the zip method cannot open a package this size. The zip
+  # unpacks with Windows' own tools and runs as is.
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: zip
+      arch: [x64, arm64]
+  # npm run icon draws it, with the .icns and .png.
+  icon: build/icon.ico
+
+nsis:
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: MARGIE-${version}-${arch}-setup.${ext}
+
+dmg:
+  title: MARGIE ${version}
+  artifactName: MARGIE-${version}-${arch}.${ext}
+  # The familiar drag-to-Applications window.
+  contents:
+    - x: 140
+      y: 200
+      type: file
+    - x: 400
+      y: 200
+      type: link
+      path: /Applications
+  window:
+    width: 540
+    height: 400
+
+# Unsigned local builds: electron-builder would otherwise hunt the keychain
+# for an identity, and warn at length when it finds none.
+publish: null

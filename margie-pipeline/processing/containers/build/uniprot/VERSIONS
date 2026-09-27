@@ -1,0 +1,5 @@
+DIAMOND_VERSION=2.1.9
+DIAMOND_SOURCE=https://github.com/bbuchfink/diamond/archive/refs/tags/v2.1.9.tar.gz
+UNIPROT_SPROT_RELEASE=2025_05
+UNIPROT_SPROT_SOURCE=https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz
+BASE_IMAGE=debian:12-slim

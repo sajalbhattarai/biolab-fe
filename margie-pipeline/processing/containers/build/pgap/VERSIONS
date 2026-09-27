@@ -1,0 +1,5 @@
+HMMER_VERSION=3.4
+HMMER_SOURCE=http://eddylab.org/software/hmmer/hmmer-3.4.tar.gz
+PGAP_HMM_RELEASE=hmm_PGAP-15.0
+PGAP_HMM_SOURCE=https://ftp.ncbi.nlm.nih.gov/hmm/current/
+BASE_IMAGE=debian:12-slim

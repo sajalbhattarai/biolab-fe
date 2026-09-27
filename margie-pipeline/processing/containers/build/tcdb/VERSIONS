@@ -1,0 +1,5 @@
+DIAMOND_VERSION=2.1.9
+DIAMOND_SOURCE=https://github.com/bbuchfink/diamond/archive/refs/tags/v2.1.9.tar.gz
+TCDB_RELEASE=2024
+TCDB_SOURCE=https://www.tcdb.org/download.php
+BASE_IMAGE=debian:12-slim

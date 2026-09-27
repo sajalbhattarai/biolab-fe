@@ -1,0 +1,5 @@
+tool=geneprop
+language=python3 (ubuntu:24.04 system python ~3.12)
+base_image=ubuntu:24.04
+license=Apache-2.0 (upstream flatfiles) + BSD-3-Clause (first-party scripts)
+upstream_repo=https://github.com/ebi-pf-team/genome-properties (mounted at /db)

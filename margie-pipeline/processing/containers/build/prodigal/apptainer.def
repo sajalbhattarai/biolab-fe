@@ -1,0 +1,65 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# prodigal — apptainer recipe (hand-translated from Dockerfile)
+# Gene calling without RASTtk, in the RASTtk gene_calls layout.
+# Two-stage build: builder compiles Prodigal, runtime ships only the binary.
+# See LICENSE.md for license terms (Prodigal: GPL-3.0).
+# ──────────────────────────────────────────────────────────────────────────────
+
+Bootstrap: docker
+From: debian:12-slim
+Stage: builder
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    PRODIGAL_VERSION=2.6.3
+
+    apt-get update && apt-get install -y --no-install-recommends \
+            build-essential ca-certificates wget \
+     && rm -rf /var/lib/apt/lists/*
+
+    cd /tmp \
+     && wget -q "https://github.com/hyattpd/Prodigal/archive/refs/tags/v${PRODIGAL_VERSION}.tar.gz" -O prodigal.tar.gz \
+     && tar -xzf prodigal.tar.gz \
+     && cd "Prodigal-${PRODIGAL_VERSION}" \
+     && make \
+     && install -m 0755 prodigal /usr/local/bin/prodigal \
+     && cd / && rm -rf /tmp/prodigal.tar.gz "/tmp/Prodigal-${PRODIGAL_VERSION}"
+
+Bootstrap: docker
+From: debian:12-slim
+
+%files
+    entrypoint.sh                  /opt/prodigal/entrypoint.sh
+    scripts/format_gene_calls.py   /opt/prodigal/scripts/format_gene_calls.py
+    LICENSE.md                     /opt/prodigal/LICENSE.md
+    VERSIONS                       /opt/prodigal/VERSIONS
+
+%files from builder
+    /usr/local/bin/prodigal /usr/local/bin/prodigal
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update && apt-get install -y --no-install-recommends \
+            python3 bash ca-certificates \
+     && rm -rf /var/lib/apt/lists/*
+    chmod -R a+rX /opt/prodigal
+    find /opt/prodigal -type f \( -name '*.sh' -o -name '*.py' \) -exec chmod a+x {} +
+    ln -sf /opt/prodigal/entrypoint.sh /usr/local/bin/run
+    mkdir -p /input /output
+    printf '{\n  "tool": "prodigal",\n  "prodigal_version": "2.6.3",\n  "base_image": "debian:12-slim",\n  "build_date": "%s"\n}\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /etc/pipeline-build.json
+
+%environment
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+
+%runscript
+    exec /usr/local/bin/run "$@"
+
+%labels
+    org.opencontainers.image.title prodigal
+    org.opencontainers.image.description Prodigal gene calling in the RASTtk gene_calls layout (from-source build)
+    org.opencontainers.image.licenses GPL-3.0-only
+    org.opencontainers.image.version prodigal-2.6.3

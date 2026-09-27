@@ -1,0 +1,7 @@
+KOFAMSCAN_VERSION=1.3.0
+KOFAMSCAN_SOURCE=https://www.genome.jp/ftp/tools/kofam_scan/kofam_scan-1.3.0.tar.gz
+HMMER_VERSION=3.4
+HMMER_SOURCE=http://eddylab.org/software/hmmer/hmmer-3.4.tar.gz
+KEGG_PROFILES_SOURCE=https://www.genome.jp/ftp/db/kofam/profiles.tar.gz
+KEGG_KO_LIST_SOURCE=https://www.genome.jp/ftp/db/kofam/ko_list.gz
+BASE_IMAGE=debian:12-slim

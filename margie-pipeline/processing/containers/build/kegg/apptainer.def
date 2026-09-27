@@ -1,0 +1,72 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# kegg — apptainer recipe (hand-translated from Dockerfile)
+# KEGG Ortholog assignment via KofamScan.
+# KofamScan from ftp.genome.jp official tarball, HMMER pre-compiled Linux binary.
+# GNU parallel from Debian (BSD-licensed redistributable).
+# See LICENSE.md for license terms.
+# ──────────────────────────────────────────────────────────────────────────────
+
+Bootstrap: docker
+From: debian:12-slim
+
+%files
+    entrypoint.sh /opt/kegg/entrypoint.sh
+    scripts      /opt/kegg/
+    LICENSE.md    /opt/kegg/LICENSE.md
+    VERSIONS      /opt/kegg/VERSIONS
+
+%labels
+    org.opencontainers.image.title         kegg
+    org.opencontainers.image.description   "KofamScan against KEGG Orthology HMM profiles (HMMER pre-built binary)"
+    org.opencontainers.image.source        https://github.com/sajalbhattarai/containers
+    org.opencontainers.image.vendor        margie-annotation
+    org.opencontainers.image.licenses      "MIT AND BSD-3-Clause"
+    org.opencontainers.image.version       kofamscan-1.3.0+hmmer-3.4
+
+%environment
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+
+    HMMER_VERSION=3.4
+    KOFAMSCAN_VERSION=1.3.0
+
+    apt-get update && apt-get install -y --no-install-recommends \
+            tini bash ca-certificates wget ruby parallel python3 \
+     && rm -rf /var/lib/apt/lists/*
+
+    # Install HMMER pre-compiled Linux binary
+    cd /tmp \
+     && wget -q "http://eddylab.org/software/hmmer/hmmer-${HMMER_VERSION}-linux-intel-x86_64.tar.gz" \
+     && tar -xzf "hmmer-${HMMER_VERSION}-linux-intel-x86_64.tar.gz" \
+     && cp "hmmer-${HMMER_VERSION}-linux-intel-x86_64/binaries/hmmscan"   /usr/local/bin/hmmscan \
+     && cp "hmmer-${HMMER_VERSION}-linux-intel-x86_64/binaries/hmmsearch" /usr/local/bin/hmmsearch \
+     && cp "hmmer-${HMMER_VERSION}-linux-intel-x86_64/binaries/hmmpress"  /usr/local/bin/hmmpress \
+     && chmod +x /usr/local/bin/hmmscan /usr/local/bin/hmmsearch /usr/local/bin/hmmpress \
+     && rm -rf "hmmer-${HMMER_VERSION}-linux-intel-x86_64" "hmmer-${HMMER_VERSION}-linux-intel-x86_64.tar.gz"
+
+    # Install KofamScan from upstream genome.jp tarball
+    cd /opt \
+     && wget -q "https://www.genome.jp/ftp/tools/kofam_scan/kofam_scan-${KOFAMSCAN_VERSION}.tar.gz" \
+     && tar -xzf "kofam_scan-${KOFAMSCAN_VERSION}.tar.gz" \
+     && rm "kofam_scan-${KOFAMSCAN_VERSION}.tar.gz" \
+     && mv "kofam_scan-${KOFAMSCAN_VERSION}" kofamscan \
+     && ln -sf /opt/kofamscan/exec_annotation /usr/local/bin/exec_annotation
+
+    chmod -R a+rX /opt/kegg /opt/kofamscan \
+     && find /opt/kegg -type f \( -name '*.sh' -o -name '*.py' \) -exec chmod a+x {} + \
+     && ln -sf /opt/kegg/entrypoint.sh /usr/local/bin/run \
+     && mkdir -p /input /output /db
+
+    printf '{\n  "tool": "kegg",\n  "kofamscan_version": "%s",\n  "hmmer_version": "%s",\n  "base_image": "debian:12-slim",\n  "build_date": "%s"\n}\n' \
+            "${KOFAMSCAN_VERSION}" "${HMMER_VERSION}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            > /etc/pipeline-build.json
+
+%runscript
+    exec /usr/bin/tini -- /usr/local/bin/run "$@"

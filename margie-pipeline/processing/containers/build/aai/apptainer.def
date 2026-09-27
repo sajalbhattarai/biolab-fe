@@ -1,0 +1,73 @@
+Bootstrap: docker
+From: python:3.11-slim
+
+%files
+    entrypoint.sh /opt/aai/entrypoint.sh
+    scripts      /opt/aai/
+    LICENSE.md    /opt/aai/LICENSE.md
+    VERSIONS      /opt/aai/VERSIONS
+
+%labels
+    org.opencontainers.image.title       aai
+    org.opencontainers.image.description "Average Amino Acid Identity via EzAAI (all-vs-all)"
+    org.opencontainers.image.source      https://github.com/sajalbhattarai/margie-pipeline
+    org.opencontainers.image.vendor      margie-annotation
+    org.opencontainers.image.licenses    "MIT AND GPL-3.0-or-later"
+    org.opencontainers.image.version     ezaai-1.2.4+diamond-2.1.9+java-21
+
+%environment
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    EZAAI_VERSION=1.2.4
+    DIAMOND_VERSION=2.1.9
+    JAVA_VERSION=21
+
+    apt-get update && apt-get install -y --no-install-recommends \
+            tini bash ca-certificates wget zlib1g zlib1g-dev \
+            build-essential cmake \
+            "openjdk-21-jre-headless" \
+     && rm -rf /var/lib/apt/lists/*
+
+    # Compile DIAMOND from source (works on both amd64 and arm64)
+    cd /tmp \
+     && wget -q "https://github.com/bbuchfink/diamond/archive/refs/tags/v${DIAMOND_VERSION}.tar.gz" \
+     && tar -xzf "v${DIAMOND_VERSION}.tar.gz" \
+     && cd "diamond-${DIAMOND_VERSION}" \
+     && mkdir -p build && cd build \
+     && cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local .. \
+     && make -j"$(nproc)" && make install \
+     && strip /usr/local/bin/diamond \
+     && cd / && rm -rf /tmp/diamond-* /tmp/v${DIAMOND_VERSION}.tar.gz
+
+    # Download EzAAI (v1.2.3+ ships as ezaai-bin.tar.gz containing EzAAI.jar)
+    mkdir -p /opt/aai
+    cd /tmp \
+     && wget -q "https://github.com/endixk/ezaai/releases/download/v${EZAAI_VERSION}/ezaai-bin.tar.gz" \
+     && tar -xzf ezaai-bin.tar.gz EzAAI.jar \
+     && mv EzAAI.jar /opt/aai/EzAAI.jar \
+     && rm -f ezaai-bin.tar.gz
+    chmod a+r /opt/aai/EzAAI.jar
+
+    # ezaai wrapper
+    printf '#!/usr/bin/env bash\nexec java -jar /opt/aai/EzAAI.jar "$@"\n' \
+        > /usr/local/bin/ezaai
+    chmod a+x /usr/local/bin/ezaai
+
+    chmod -R a+rX /opt/aai \
+     && find /opt/aai -type f \( -name '*.sh' -o -name '*.py' \) -exec chmod a+x {} + \
+     && ln -sf /opt/aai/entrypoint.sh /usr/local/bin/run \
+     && mkdir -p /input /output
+
+    printf '{\n  "tool": "aai",\n  "ezaai_version": "%s",\n  "diamond_version": "%s",\n  "base_image": "python:3.11-slim"\n}\n' \
+        "${EZAAI_VERSION}" "${DIAMOND_VERSION}" > /etc/pipeline-build.json
+
+    # Remove build-only packages
+    apt-get purge -y build-essential cmake zlib1g-dev && apt-get autoremove -y
+
+%runscript
+    exec /usr/local/bin/run "$@"

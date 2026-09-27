@@ -1,0 +1,373 @@
+#!/usr/bin/env python3
+"""enrich-rast-tsv.py — Enrich a single rast.tsv with SEED database information.
+
+Joins each row of rast.tsv against db/rasttk/seed_database_long.tsv using
+(RAST_Subsystem_Name, RAST_description) as the primary key, with a role-only
+fallback when the subsystem name does not match exactly.
+
+Outputs:
+  - rast.tsv                 : enriched in-place (old SEED_* columns replaced)
+  - rast.tsv.bak             : backup of the original rast.tsv (first run only)
+  - seed-enrichment.tsv      : side-car file with feature_id + SEED_* columns only
+
+Usage:
+  enrich-rast-tsv.py --db /path/to/db/rasttk --rast-tsv /path/to/rast.tsv
+"""
+import argparse
+import csv
+import shutil
+import sys
+from collections import defaultdict
+from pathlib import Path
+
+
+# ---------------------------------------------------------------------------
+# Seed DB loader (lifted from margie-annotation, simplified to single-file mode)
+# ---------------------------------------------------------------------------
+
+def _uadd(seen: set, lst: list, val: str):
+    if val and val not in seen:
+        seen.add(val)
+        lst.append(val)
+
+
+def _uadd_pipe(seen: set, lst: list, field: str):
+    for v in field.split("|"):
+        v = v.strip()
+        if v:
+            _uadd(seen, lst, v)
+
+
+def _new_acc():
+    return {
+        'variant_codes':               [], '_vc_seen': set(),
+        'presence_statuses':           [], '_ps_seen': set(),
+        'variant_genome_counts':       [], '_gc_seen': set(),
+        'variant_distinct_role_counts':[], '_rc_seen': set(),
+        'role_abbreviations':          [], '_ra_seen': set(),
+        'authors':                     [], '_au_seen': set(),
+        'last_modified':               [], '_lm_seen': set(),
+        'web_descriptions':            [], '_wd_seen': set(),
+        'notes':                       [], '_no_seen': set(),
+        'hope_curation_notes':         [], '_hn_seen': set(),
+        'sapling_descriptions':        [], '_sd_seen': set(),
+        'ec_numbers':                  [], '_ec_seen': set(),
+        'reaction_ids':                [], '_ri_seen': set(),
+        'reaction_equations':          [], '_re_seen': set(),
+        'modelseed_compound_ids':      [], '_ci_seen': set(),
+        'modelseed_compound_names':    [], '_cn_seen': set(),
+        'modelseed_compound_formulas': [], '_cf_seen': set(),
+        'kegg_rxn_ids':                [], '_ki_seen': set(),
+        'kegg_rxn_names':              [], '_kn_seen': set(),
+        'kegg_rxn_definitions':        [], '_kd_seen': set(),
+        'kegg_rxn_equations':          [], '_ke_seen': set(),
+        'kegg_compound_ids':           [], '_kc_seen': set(),
+        'kegg_compound_names':         [], '_kcn_seen': set(),
+    }
+
+
+def load_seed_db(tsv_path: Path):
+    lookup: dict = defaultdict(_new_acc)
+    role_fallback: dict = defaultdict(_new_acc)
+
+    def _clean(s):
+        return s.strip().replace("\\n", " ").replace("\n", " ").replace("\r", "")
+
+    n_roles = 0
+    with open(tsv_path, newline="", encoding="utf-8", errors="replace") as fh:
+        reader = csv.DictReader(fh, delimiter="\t")
+        for row in reader:
+            subsystem = row.get("SEED_subsystem", "").strip()
+            role = row.get("SEED_role", "").strip()
+            if not role:
+                continue
+            n_roles += 1
+            for key, d in [((subsystem, role), lookup), (role, role_fallback)]:
+                acc = d[key]
+                _uadd(acc['_vc_seen'], acc['variant_codes'],
+                      row.get("SEED_variant_code", "").strip())
+                _uadd(acc['_ps_seen'], acc['presence_statuses'],
+                      row.get("SEED_presence_status", "").strip())
+                _uadd(acc['_gc_seen'], acc['variant_genome_counts'],
+                      row.get("SEED_variant_genome_count", "").strip())
+                _uadd(acc['_rc_seen'], acc['variant_distinct_role_counts'],
+                      row.get("SEED_variant_distinct_role_count", "").strip())
+                _uadd(acc['_ra_seen'], acc['role_abbreviations'],
+                      row.get("SEED_role_abbreviation", "").strip())
+                _uadd(acc['_au_seen'], acc['authors'],
+                      row.get("SEED_author", "").strip())
+                _uadd(acc['_lm_seen'], acc['last_modified'],
+                      row.get("SEED_last_modified", "").strip())
+                _uadd(acc['_wd_seen'], acc['web_descriptions'],
+                      _clean(row.get("SEED_web_description", "")))
+                _uadd(acc['_no_seen'], acc['notes'],
+                      _clean(row.get("SEED_notes", "")))
+                _uadd(acc['_hn_seen'], acc['hope_curation_notes'],
+                      _clean(row.get("SEED_hope_curation_notes", "")))
+                _uadd(acc['_sd_seen'], acc['sapling_descriptions'],
+                      _clean(row.get("SEED_sapling_description", "")))
+                _uadd_pipe(acc['_ec_seen'], acc['ec_numbers'],
+                           row.get("SEED_ec_numbers", ""))
+                _uadd_pipe(acc['_ri_seen'], acc['reaction_ids'],
+                           row.get("SEED_reaction_ids", ""))
+                _uadd_pipe(acc['_re_seen'], acc['reaction_equations'],
+                           row.get("SEED_reaction_equations", ""))
+                _uadd_pipe(acc['_ci_seen'], acc['modelseed_compound_ids'],
+                           row.get("SEED_modelseed_compound_ids", ""))
+                _uadd_pipe(acc['_cn_seen'], acc['modelseed_compound_names'],
+                           row.get("SEED_modelseed_compound_names", ""))
+                _uadd_pipe(acc['_cf_seen'], acc['modelseed_compound_formulas'],
+                           row.get("SEED_modelseed_compound_formulas", ""))
+                _uadd_pipe(acc['_ki_seen'], acc['kegg_rxn_ids'],
+                           row.get("SEED_kegg_reaction_ids", ""))
+                _uadd_pipe(acc['_kn_seen'], acc['kegg_rxn_names'],
+                           row.get("SEED_kegg_reaction_names", ""))
+                _uadd_pipe(acc['_kd_seen'], acc['kegg_rxn_definitions'],
+                           row.get("SEED_kegg_reaction_definitions", ""))
+                _uadd_pipe(acc['_ke_seen'], acc['kegg_rxn_equations'],
+                           row.get("SEED_kegg_reaction_equations", ""))
+                _uadd_pipe(acc['_kc_seen'], acc['kegg_compound_ids'],
+                           row.get("SEED_kegg_compound_ids", ""))
+                _uadd_pipe(acc['_kcn_seen'], acc['kegg_compound_names'],
+                           row.get("SEED_kegg_compound_names", ""))
+
+    print(f"[enrich] SEED DB loaded: {n_roles} role rows, "
+          f"{len(lookup)} (subsystem,role) pairs, "
+          f"{len(role_fallback)} unique roles", file=sys.stderr)
+    return dict(lookup), dict(role_fallback)
+
+
+def lookup_seed(subsystem_field: str, role: str,
+                sub_role_lookup: dict, role_fallback: dict) -> dict:
+    result: dict = defaultdict(lambda: {'vals': [], 'seen': set()})
+    subsystems = [s.strip() for s in subsystem_field.split(";") if s.strip()]
+
+    def _merge(acc: dict):
+        for field, vals in acc.items():
+            if field.startswith('_'):
+                continue
+            for v in vals:
+                if v and v not in result[field]['seen']:
+                    result[field]['seen'].add(v)
+                    result[field]['vals'].append(v)
+
+    matched = False
+    for sub in subsystems:
+        key = (sub, role)
+        if key in sub_role_lookup:
+            _merge(sub_role_lookup[key])
+            matched = True
+    if not matched and role in role_fallback:
+        _merge(role_fallback[role])
+    return {k: v['vals'] for k, v in result.items()}
+
+
+# ---------------------------------------------------------------------------
+# Column schema
+# ---------------------------------------------------------------------------
+
+NEW_SEED_COLS = [
+    "SEED_variant_code",
+    "SEED_presence_status",
+    "SEED_variant_genome_count",
+    "SEED_variant_distinct_role_count",
+    "SEED_role_abbreviation",
+    "SEED_author",
+    "SEED_last_modified",
+    "SEED_web_description",
+    "SEED_notes",
+    "SEED_hope_curation_notes",
+    "SEED_sapling_description",
+    "SEED_ec_numbers",
+    "SEED_reaction_ids",
+    "SEED_reaction_equations",
+    "SEED_modelseed_compound_ids",
+    "SEED_modelseed_compound_names",
+    "SEED_modelseed_compound_formulas",
+    "SEED_kegg_reaction_ids",
+    "SEED_kegg_reaction_names",
+    "SEED_kegg_reaction_definitions",
+    "SEED_kegg_reaction_equations",
+    "SEED_kegg_compound_ids",
+    "SEED_kegg_compound_names",
+]
+
+OLD_SEED_COLS = {
+    "SEED_variant_number",
+    "SEED_variant_definition",
+    "SEED_curator",
+    "SEED_description",
+    "SEED_notes",
+    "SEED_version",
+    "SEED_subsystem_notes",
+}
+
+_FIELD_MAP = {
+    "variant_codes":               "SEED_variant_code",
+    "presence_statuses":           "SEED_presence_status",
+    "variant_genome_counts":       "SEED_variant_genome_count",
+    "variant_distinct_role_counts":"SEED_variant_distinct_role_count",
+    "role_abbreviations":          "SEED_role_abbreviation",
+    "authors":                     "SEED_author",
+    "last_modified":               "SEED_last_modified",
+    "web_descriptions":            "SEED_web_description",
+    "notes":                       "SEED_notes",
+    "hope_curation_notes":         "SEED_hope_curation_notes",
+    "sapling_descriptions":        "SEED_sapling_description",
+    "ec_numbers":                  "SEED_ec_numbers",
+    "reaction_ids":                "SEED_reaction_ids",
+    "reaction_equations":          "SEED_reaction_equations",
+    "modelseed_compound_ids":      "SEED_modelseed_compound_ids",
+    "modelseed_compound_names":    "SEED_modelseed_compound_names",
+    "modelseed_compound_formulas": "SEED_modelseed_compound_formulas",
+    "kegg_rxn_ids":                "SEED_kegg_reaction_ids",
+    "kegg_rxn_names":              "SEED_kegg_reaction_names",
+    "kegg_rxn_definitions":        "SEED_kegg_reaction_definitions",
+    "kegg_rxn_equations":          "SEED_kegg_reaction_equations",
+    "kegg_compound_ids":           "SEED_kegg_compound_ids",
+    "kegg_compound_names":         "SEED_kegg_compound_names",
+}
+
+
+# ---------------------------------------------------------------------------
+# Enrichment
+# ---------------------------------------------------------------------------
+
+def enrich_rast_tsv(rast_tsv: Path, sub_role_lookup: dict, role_fallback: dict,
+                    backup: bool = True, sidecar: bool = True):
+    if not rast_tsv.is_file():
+        print(f"[enrich] SKIP (not found): {rast_tsv}", file=sys.stderr)
+        return 0, 0
+
+    if backup:
+        bak = rast_tsv.with_suffix(".tsv.bak")
+        if not bak.exists():
+            shutil.copy2(rast_tsv, bak)
+
+    with open(rast_tsv, newline="", encoding="utf-8", errors="replace") as fh:
+        reader = csv.DictReader(fh, delimiter="\t")
+        orig_fields = reader.fieldnames or []
+        rows = list(reader)
+
+    base_fields = [f for f in orig_fields if f not in OLD_SEED_COLS]
+    out_fields = base_fields + [c for c in NEW_SEED_COLS if c not in base_fields]
+
+    sidecar_rows = []
+    enriched = 0
+    out_rows = []
+    for row in rows:
+        subsystem = row.get("RAST_Subsystem_Name", "").strip()
+        role = row.get("RAST_description", "").strip()
+
+        seed_data: dict = {}
+        if subsystem or role:
+            raw = lookup_seed(subsystem, role, sub_role_lookup, role_fallback)
+            for db_key, col_name in _FIELD_MAP.items():
+                vals = raw.get(db_key, [])
+                seed_data[col_name] = " | ".join(v for v in vals if v)
+
+        for old in OLD_SEED_COLS:
+            row.pop(old, None)
+        for col in NEW_SEED_COLS:
+            row[col] = seed_data.get(col, "")
+
+        if any(seed_data.get(c, "") for c in NEW_SEED_COLS):
+            enriched += 1
+
+        out_rows.append(row)
+
+        if sidecar:
+            side = {
+                "feature_id":         row.get("feature_id", ""),
+                "RAST_gene_id":       row.get("RAST_gene_id", ""),
+                "RAST_description":   role,
+                "RAST_Subsystem_Name":subsystem,
+            }
+            for col in NEW_SEED_COLS:
+                side[col] = row.get(col, "")
+            sidecar_rows.append(side)
+
+    tmp = rast_tsv.with_suffix(".tsv.tmp")
+    with open(tmp, "w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=out_fields, delimiter="\t",
+                                lineterminator="\n", extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(out_rows)
+    tmp.replace(rast_tsv)
+
+    if sidecar:
+        side_path = rast_tsv.parent / "seed-enrichment.tsv"
+        side_fields = ["feature_id", "RAST_gene_id", "RAST_description",
+                       "RAST_Subsystem_Name"] + NEW_SEED_COLS
+        with open(side_path, "w", newline="", encoding="utf-8") as fh:
+            w = csv.DictWriter(fh, fieldnames=side_fields, delimiter="\t",
+                               lineterminator="\n", extrasaction="ignore")
+            w.writeheader()
+            w.writerows(sidecar_rows)
+
+    return len(rows), enriched
+
+
+def main():
+    p = argparse.ArgumentParser(
+        description="Enrich a rast.tsv file (or a tree of them) with SEED data"
+    )
+    p.add_argument("--db", required=True,
+                   help="db/rasttk directory (containing seed_database_long.tsv)")
+    src = p.add_mutually_exclusive_group(required=True)
+    src.add_argument("--rast-tsv", help="Single rast.tsv to enrich")
+    src.add_argument("--root", help="Directory to recurse; enriches every rast.tsv found")
+    p.add_argument("--no-backup", action="store_true")
+    p.add_argument("--no-sidecar", action="store_true")
+    args = p.parse_args()
+
+    long_tsv = Path(args.db) / "seed_database_long.tsv"
+    if not long_tsv.is_file():
+        print(f"[enrich] ERROR: seed_database_long.tsv not found at {long_tsv}",
+              file=sys.stderr)
+        sys.exit(1)
+
+    print(f"[enrich] Loading SEED database from {long_tsv} ...", file=sys.stderr)
+    sub_role_lookup, role_fallback = load_seed_db(long_tsv)
+
+    targets = []
+    if args.rast_tsv:
+        targets = [Path(args.rast_tsv)]
+    else:
+        # Match both the canonical rast.tsv and per-domain variants
+        # (rast_arch.tsv, rast_bact_gramN.tsv, rast_unknown.tsv, ...).
+        # rast.tsv.bak files are skipped via the .tsv suffix filter below.
+        seen = set()
+        candidates = []
+        for pat in ("rast.tsv", "rast_*.tsv"):
+            for f in Path(args.root).rglob(pat):
+                if f.name.endswith(".bak"):
+                    continue
+                if f in seen:
+                    continue
+                seen.add(f)
+                candidates.append(f)
+        for f in sorted(candidates):
+            targets.append(f)
+
+    if not targets:
+        print(f"[enrich] No rast.tsv files found.", file=sys.stderr)
+        return
+
+    total_rows = total_enriched = 0
+    for t in targets:
+        n, e = enrich_rast_tsv(
+            t, sub_role_lookup, role_fallback,
+            backup=not args.no_backup, sidecar=not args.no_sidecar,
+        )
+        total_rows += n
+        total_enriched += e
+        pct = (100 * e / n) if n else 0
+        print(f"  {t}: {e}/{n} rows enriched ({pct:.1f}%)", file=sys.stderr)
+
+    print(f"[enrich] Done. {len(targets)} files; "
+          f"{total_enriched}/{total_rows} rows enriched.", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()

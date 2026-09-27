@@ -1,0 +1,5 @@
+tool=deepsig
+base_image=bolognabiocomp/deepsig@sha256:2d8ccba3406ec3814de3cc84b13047b70f26d5546acefb63a573fc20c009e9a9
+base_image_tag_at_pin=bolognabiocomp/deepsig:latest (resolved 2026-05-30)
+upstream=https://github.com/BolognaBiocomp/deepsig
+license=GPL-3.0-only

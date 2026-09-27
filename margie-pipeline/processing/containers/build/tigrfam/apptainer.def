@@ -1,0 +1,51 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# tigrfam — apptainer recipe (hand-translated from Dockerfile)
+# HMMER hmmscan against TIGRFAMs. Single-stage; HMMER installed via apt.
+# See LICENSE.md for license terms.
+# ──────────────────────────────────────────────────────────────────────────────
+
+Bootstrap: docker
+From: debian:12-slim
+
+%files
+    entrypoint.sh /opt/tigrfam/entrypoint.sh
+    scripts      /opt/tigrfam/
+    LICENSE.md    /opt/tigrfam/LICENSE.md
+    VERSIONS      /opt/tigrfam/VERSIONS
+
+%labels
+    org.opencontainers.image.title         tigrfam
+    org.opencontainers.image.description   "HMMER hmmscan against TIGRFAMs 15.0 (apt-installed HMMER)"
+    org.opencontainers.image.source        https://github.com/sajalbhattarai/containers
+    org.opencontainers.image.vendor        margie-annotation
+    org.opencontainers.image.licenses      "BSD-3-Clause AND CC-BY-SA-4.0"
+    org.opencontainers.image.version       hmmer-3.3.2
+
+%environment
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+
+    HMMER_VERSION=3.3.2
+
+    apt-get update && apt-get install -y --no-install-recommends \
+            python3 tini bash ca-certificates hmmer \
+     && rm -rf /var/lib/apt/lists/*
+
+    chmod -R a+rX /opt/tigrfam \
+     && find /opt/tigrfam -type f \( -name '*.sh' -o -name '*.py' \) -exec chmod a+x {} + \
+     && ln -sf /opt/tigrfam/entrypoint.sh /usr/local/bin/run \
+     && mkdir -p /input /output /db
+
+    printf '{\n  "tool": "tigrfam",\n  "hmmer_version": "%s",\n  "base_image": "debian:12-slim",\n  "build_date": "%s"\n}\n' \
+            "${HMMER_VERSION}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            > /etc/pipeline-build.json
+
+%runscript
+    exec /usr/bin/tini -- /usr/local/bin/run "$@"

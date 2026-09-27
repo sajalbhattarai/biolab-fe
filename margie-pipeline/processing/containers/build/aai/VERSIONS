@@ -1,0 +1,7 @@
+EZAAI_VERSION=1.2.4
+EZAAI_SOURCE=https://github.com/endixk/ezaai/releases/download/v1.2.4/ezaai-bin.tar.gz
+DIAMOND_VERSION=2.1.9
+DIAMOND_SOURCE=https://github.com/bbuchfink/diamond/archive/refs/tags/v2.1.9.tar.gz
+JAVA_VERSION=21
+BASE_IMAGE=python:3.11-slim
+PLATFORM=linux/amd64,linux/arm64

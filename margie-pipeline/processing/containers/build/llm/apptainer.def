@@ -1,0 +1,26 @@
+Bootstrap: docker
+From: python:3.11-slim
+
+%files
+    entrypoint.py /usr/local/bin/entrypoint.py
+
+%labels
+    org.opencontainers.image.title       llm
+    org.opencontainers.image.description "LLM scoring stage for the margie-annotation pipeline (placeholder)"
+    org.opencontainers.image.source      https://github.com/sajalbhattarai/margie-pipeline
+    org.opencontainers.image.vendor      margie-annotation
+    org.opencontainers.image.licenses    "MIT"
+    org.opencontainers.image.version     placeholder-1.0
+
+%environment
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+
+%post
+    set -eux
+    pip install --no-cache-dir pandas
+
+    chmod +x /usr/local/bin/entrypoint.py
+
+%runscript
+    exec python3 /usr/local/bin/entrypoint.py "$@"

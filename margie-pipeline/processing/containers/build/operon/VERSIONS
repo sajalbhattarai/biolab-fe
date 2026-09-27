@@ -1,0 +1,11 @@
+UNIOP_UPSTREAM=https://github.com/hongsua/UniOP
+UNIOP_COMMIT=68c55d2f8b890bd645f1fb0768137f6c09ba00e5
+UNIOP_SNAPSHOT_DATE=2025-05-30
+UNIOP_VENDORED_PATH=./UniOP  (this build directory; copied verbatim into image at /opt/UniOP)
+NUMPY_VERSION=1.26.4
+PANDAS_VERSION=2.2.2
+SCIKIT_LEARN_VERSION=1.4.2
+SCIPY_VERSION=1.13.1
+JOBLIB_VERSION=1.4.2
+PRODIGAL_VERSION=2.6.3 (from Debian 12 apt: package `prodigal`)
+BASE_IMAGE=python:3.11-slim

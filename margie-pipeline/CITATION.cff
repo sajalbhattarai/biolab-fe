@@ -1,0 +1,14 @@
+cff-version: 2026.1.0
+message: "If you use MARGIE in academic work, please cite it as below, and also cite each underlying tool and database listed in the README."
+title: "MARGIE: Mostly Automated Rapid Genome Inference Environment"
+abbreviation: MARGIE
+authors:
+  - name: "Sajal Bhattarai"
+    affiliation: "Department of Food Science, Purdue University"
+  - name: "Dane Deemer"
+    affiliation: "Rosen Center for Advanced Computing, Purdue University"
+  - name: "Stephen R Lindemann"
+    affiliation: "Department of Food Science, Purdue University"
+type: software
+license: MIT
+repository-code: "https://github.com/sajalbhattarai/margie-pipeline"

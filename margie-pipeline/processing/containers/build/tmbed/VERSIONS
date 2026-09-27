@@ -1,0 +1,8 @@
+TMBED_REF=v1.0.0
+TMBED_SOURCE=https://github.com/BernhoferM/TMbed/releases/tag/v1.0.0
+TORCH_VERSION=2.2.2
+TORCH_SOURCE=https://download.pytorch.org/whl/cpu
+TRANSFORMERS_VERSION=4.36.2
+PROTT5_MODEL=Rostlab/prot_t5_xl_half_uniref50-enc
+PROTT5_SOURCE=https://huggingface.co/Rostlab/prot_t5_xl_half_uniref50-enc
+BASE_IMAGE=python:3.11-slim

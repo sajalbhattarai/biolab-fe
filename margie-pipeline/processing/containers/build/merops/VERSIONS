@@ -1,0 +1,5 @@
+DIAMOND_VERSION=2.1.9
+DIAMOND_SOURCE=https://github.com/bbuchfink/diamond/archive/refs/tags/v2.1.9.tar.gz
+MEROPS_RELEASE=12.5
+MEROPS_SOURCE=https://www.ebi.ac.uk/merops/download_list.shtml
+BASE_IMAGE=debian:12-slim

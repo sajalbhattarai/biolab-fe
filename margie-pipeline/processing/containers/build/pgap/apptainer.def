@@ -1,0 +1,52 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# pgap — apptainer recipe (hand-translated from Dockerfile)
+# HMMER hmmscan against the NCBI PGAP HMM library (NCBIfam + TIGRfam).
+# Single-stage; HMMER installed via apt.
+# See LICENSE.md for license terms.
+# ──────────────────────────────────────────────────────────────────────────────
+
+Bootstrap: docker
+From: debian:12-slim
+
+%files
+    entrypoint.sh /opt/pgap/entrypoint.sh
+    scripts      /opt/pgap/
+    LICENSE.md    /opt/pgap/LICENSE.md
+    VERSIONS      /opt/pgap/VERSIONS
+
+%labels
+    org.opencontainers.image.title         pgap
+    org.opencontainers.image.description   "HMMER hmmscan against NCBI PGAP HMM library (apt-installed HMMER)"
+    org.opencontainers.image.source        https://github.com/sajalbhattarai/containers
+    org.opencontainers.image.vendor        margie-annotation
+    org.opencontainers.image.licenses      "BSD-3-Clause AND PublicDomain"
+    org.opencontainers.image.version       hmmer-3.3.2
+
+%environment
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+
+    HMMER_VERSION=3.3.2
+
+    apt-get update && apt-get install -y --no-install-recommends \
+            python3 tini bash ca-certificates hmmer \
+     && rm -rf /var/lib/apt/lists/*
+
+    chmod -R a+rX /opt/pgap \
+     && find /opt/pgap -type f \( -name '*.sh' -o -name '*.py' \) -exec chmod a+x {} + \
+     && ln -sf /opt/pgap/entrypoint.sh /usr/local/bin/run \
+     && mkdir -p /input /output /db
+
+    printf '{\n  "tool": "pgap",\n  "hmmer_version": "%s",\n  "base_image": "debian:12-slim",\n  "build_date": "%s"\n}\n' \
+            "${HMMER_VERSION}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            > /etc/pipeline-build.json
+
+%runscript
+    exec /usr/bin/tini -- /usr/local/bin/run "$@"

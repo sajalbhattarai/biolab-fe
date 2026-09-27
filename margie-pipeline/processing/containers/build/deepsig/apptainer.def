@@ -1,0 +1,55 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# deepsig — apptainer recipe (hand-translated from Dockerfile)
+# Neural signal-peptide prediction (BolognaBiocomp DeepSig)
+# Source:  https://github.com/BolognaBiocomp/deepsig (GPL-3, redistributable)
+# Uses the official bolognabiocomp/deepsig base image, which bundles
+# python + tensorflow + biopython + deepsig source at /usr/src/deepsig.
+# Local pipeline elaboration: adds scripts/process_deepsig_raw_results.py and
+# the shared scripts/pipeline_log.sh helper that entrypoint.sh sources.
+# Base image pinned by digest (resolved 2026-05-30 from bolognabiocomp/deepsig:latest)
+# for reproducible from-source builds.
+# ──────────────────────────────────────────────────────────────────────────────
+
+Bootstrap: docker
+From: bolognabiocomp/deepsig@sha256:2d8ccba3406ec3814de3cc84b13047b70f26d5546acefb63a573fc20c009e9a9
+
+%files
+    entrypoint.sh /opt/deepsig/entrypoint.sh
+    scripts      /opt/deepsig/
+    LICENSE.md    /opt/deepsig/LICENSE.md
+    VERSIONS      /opt/deepsig/VERSIONS
+
+%labels
+    org.opencontainers.image.title         deepsig
+    org.opencontainers.image.description   "DeepSig signal-peptide predictor (upstream base image)"
+    org.opencontainers.image.source        https://github.com/sajalbhattarai/containers
+    org.opencontainers.image.licenses      GPL-3.0-only
+
+%environment
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+    export PYTHONDONTWRITEBYTECODE=1
+    export TF_CPP_MIN_LOG_LEVEL=3
+    export DEEPSIG_ROOT=/usr/src/deepsig
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+    export PYTHONDONTWRITEBYTECODE=1
+    export TF_CPP_MIN_LOG_LEVEL=3
+    export DEEPSIG_ROOT=/usr/src/deepsig
+
+    # `deepsig` shim on PATH so entrypoint can call it directly
+    chmod a+x /usr/src/deepsig/deepsig.py \
+     && ln -sf /usr/src/deepsig/deepsig.py /usr/local/bin/deepsig
+
+    chmod -R a+rX /opt/deepsig \
+     && find /opt/deepsig -type f \( -name '*.sh' -o -name '*.py' \) -exec chmod a+x {} + \
+     && ln -sf /opt/deepsig/entrypoint.sh /usr/local/bin/run \
+     && mkdir -p /input /output
+
+%runscript
+    exec /usr/local/bin/run "$@"

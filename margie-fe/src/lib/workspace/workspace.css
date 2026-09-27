@@ -1,0 +1,469 @@
+/* Shared workspace styles. Colours, sizes and fonts come from the --mg-*
+   variables that prefs.ts themeVars() sets on .mg-shell. */
+
+.mg-shell {
+	position: fixed;
+	inset: 0;
+	display: flex;
+	overflow: hidden;
+	background: var(--mg-bg);
+	color: var(--mg-text);
+	font-family: var(--mg-font);
+	font-size: var(--mg-fs);
+	line-height: 1.5;
+	-webkit-font-smoothing: antialiased;
+}
+.mg-shell *,
+.mg-shell *::before,
+.mg-shell *::after {
+	box-sizing: border-box;
+}
+.mg-shell h1,
+.mg-shell h2,
+.mg-shell h3,
+.mg-shell p,
+.mg-shell dl,
+.mg-shell dd,
+.mg-shell ul,
+.mg-shell ol,
+.mg-shell figure {
+	margin: 0;
+}
+.mg-shell ul,
+.mg-shell ol {
+	list-style: none;
+	padding: 0;
+}
+.mg-shell a {
+	color: inherit;
+	text-decoration: none;
+}
+.mg-shell :focus-visible {
+	outline: 2px solid var(--mg-accent);
+	outline-offset: 2px;
+}
+.mg-mono {
+	font-family: var(--mg-mono);
+	font-size: 0.93em;
+}
+.mg-muted {
+	color: var(--mg-text-3);
+}
+.mg-grow {
+	flex-grow: 1;
+}
+.mg-sr {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- motion
+   Durations come from the --mo-* variables (motion/motion.css); Full adds a
+   fade as each panel opens. */
+
+@keyframes mg-in {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+@keyframes mg-spin {
+	to { transform: rotate(360deg); }
+}
+[data-motion='full'] .mg-in { animation: mg-in var(--mo-2) var(--mo-ease) both; }
+[data-motion='full'] .mg-spin,
+[data-motion='subtle'] .mg-spin { animation: mg-spin calc(1.2s * var(--mo-loop)) linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+	.mg-in, .mg-spin { animation: none !important; }
+}
+
+/* ---------------------------------------------------------------- text roles */
+
+.mg-label {
+	font-size: var(--mg-fs-sm);
+	font-weight: 500;
+	color: var(--mg-text-2);
+}
+.mg-note {
+	font-size: var(--mg-fs-sm);
+	color: var(--mg-text-3);
+}
+.mg-warn {
+	color: var(--mg-warn);
+}
+.mg-danger {
+	color: var(--mg-danger);
+}
+
+/* ---------------------------------------------------------------- controls */
+
+.mg-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	height: var(--mg-ctl);
+	padding: 0 14px;
+	border: 1px solid var(--mg-border-strong);
+	border-radius: 999px;
+	background: var(--mg-surface);
+	color: var(--mg-text);
+	font: inherit;
+	font-size: var(--mg-fs-sm);
+	font-weight: 500;
+	white-space: nowrap;
+	cursor: pointer;
+}
+.mg-btn:hover:not(:disabled) { background: var(--mg-surface-2); }
+.mg-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.mg-btn.primary {
+	border-color: var(--mg-accent);
+	background: var(--mg-accent);
+	color: var(--mg-on-accent);
+}
+.mg-btn.primary:hover:not(:disabled) { background: var(--mg-accent); filter: brightness(0.94); }
+.mg-btn.small { height: var(--mg-ctl-sm); padding: 0 10px; }
+
+/* A secondary action written as a word. */
+.mg-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 0;
+	border: none;
+	background: none;
+	color: var(--mg-accent-ink);
+	font: inherit;
+	font-size: var(--mg-fs-sm);
+	white-space: nowrap;
+	cursor: pointer;
+}
+.mg-link:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
+.mg-link:disabled { color: var(--mg-text-3); cursor: not-allowed; }
+.mg-link.quiet { color: var(--mg-text-2); }
+.mg-link[aria-pressed='true'] { color: var(--mg-text); font-weight: 600; }
+
+.mg-icon-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	width: var(--mg-ctl-sm);
+	height: var(--mg-ctl-sm);
+	border: none;
+	border-radius: 999px;
+	background: transparent;
+	color: var(--mg-text-2);
+	cursor: pointer;
+}
+.mg-icon-btn:hover:not(:disabled) { background: var(--mg-surface-2); color: var(--mg-text); }
+.mg-icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.mg-icon-btn.active { background: var(--mg-surface-2); color: var(--mg-text); }
+
+/* A pill tray, the chosen one raised out of it. */
+.mg-seg {
+	display: flex;
+	gap: 2px;
+	padding: 3px;
+	border: 1px solid var(--mg-border);
+	border-radius: 999px;
+	background: var(--mg-surface-2);
+}
+.mg-seg button {
+	flex: 1;
+	height: calc(var(--mg-ctl-sm) - 6px);
+	padding: 0 12px;
+	border: none;
+	border-radius: 999px;
+	background: transparent;
+	color: var(--mg-text-2);
+	font: inherit;
+	font-size: var(--mg-fs-sm);
+	white-space: nowrap;
+	cursor: pointer;
+	transition: color var(--mo-2) var(--mo-ease);
+}
+.mg-seg button[aria-checked='true'] {
+	background: var(--mg-seg-sel);
+	color: var(--mg-text);
+	font-weight: 500;
+	box-shadow: var(--mg-shadow-sm);
+}
+/* The selection slides between choices (motion/thumb.ts). */
+.mg-seg > .mo-thumb {
+	border-radius: 999px;
+	background: var(--mg-seg-sel);
+	box-shadow: var(--mg-shadow-sm);
+}
+.mg-seg.mo-has-thumb button[aria-checked='true'] {
+	box-shadow: none;
+}
+.mg-seg button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.mg-switch {
+	flex-shrink: 0;
+	display: flex;
+	width: 36px;
+	height: 20px;
+	padding: 2px;
+	border: none;
+	border-radius: 999px;
+	background: var(--mg-border-strong);
+	cursor: pointer;
+}
+.mg-switch[aria-checked='true'] { background: var(--mg-accent); }
+.mg-switch:disabled { opacity: 0.45; cursor: not-allowed; }
+.mg-switch::after {
+	content: '';
+	width: 16px;
+	height: 16px;
+	border-radius: 999px;
+	background: #fff;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+	transition: transform var(--mo-1) var(--mo-ease);
+}
+.mg-switch[aria-checked='true']::after { transform: translateX(16px); }
+[data-motion='off'] .mg-switch::after { transition: none; }
+
+.mg-input,
+.mg-select {
+	height: var(--mg-ctl-sm);
+	padding: 0 var(--mg-field-pad, 10px);
+	border: 1px solid var(--mg-border-strong);
+	border-radius: var(--mg-r);
+	background: var(--mg-surface);
+	color: var(--mg-text);
+	font: inherit;
+	font-size: var(--mg-fs-field, var(--mg-fs-sm));
+	min-width: 0;
+}
+.mg-input.mono { font-family: var(--mg-mono); }
+textarea.mg-input { height: auto; padding: 8px; resize: vertical; line-height: 1.5; }
+
+/* A plain radio: a ring, filled when chosen. */
+.mg-radio {
+	flex-shrink: 0;
+	width: 14px;
+	height: 14px;
+	border-radius: 999px;
+	border: 1.5px solid var(--mg-border-strong);
+	background: var(--mg-surface);
+}
+[aria-checked='true'] > .mg-radio {
+	border: 4px solid var(--mg-accent);
+}
+
+.mg-bar {
+	height: 3px;
+	border-radius: 999px;
+	background: var(--mg-border);
+	overflow: hidden;
+}
+.mg-bar > div {
+	height: 100%;
+	background: var(--mg-accent);
+	transition: width var(--mo-3) var(--mo-ease);
+}
+[data-motion='off'] .mg-bar > div { transition: none; }
+
+/* ---------------------------------------------------------------- surfaces */
+
+.mg-card {
+	background: var(--mg-surface);
+	border: 1px solid var(--mg-border);
+	border-radius: var(--mg-r);
+	transition:
+		border-color var(--mo-2) var(--mo-ease),
+		box-shadow var(--mo-3) var(--mo-ease);
+}
+/* A card lifts slightly under the pointer. */
+.mg-card:hover {
+	border-color: color-mix(in srgb, var(--sh, var(--mg-accent)) 22%, var(--mg-border));
+	box-shadow: 0 1px 3px color-mix(in srgb, var(--mg-text) 7%, transparent);
+}
+.mg-card-head {
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+	padding: var(--mg-pad) var(--mg-pad) 0;
+}
+/* A block's name is heading-sized, in its shade's colour. */
+.mg-card-head h2 {
+	font-size: var(--mg-fs-lg);
+	font-weight: 700;
+	letter-spacing: -0.01em;
+}
+.mg-card-body { padding: var(--mg-pad); }
+
+.mg-rows > * + * { border-top: 1px solid var(--mg-border); }
+.mg-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-height: var(--mg-row);
+	padding: 0 var(--mg-pad);
+	font-size: var(--mg-fs-sm);
+}
+
+.mg-page {
+	display: flex;
+	flex-direction: column;
+	gap: var(--mg-gap);
+	max-width: 1040px;
+}
+/* Tables take the full width rather than a prose measure. */
+.mg-page.wide {
+	max-width: none;
+}
+
+/* ---------------------------------------------------------------- shades */
+
+/* One hue per kind of block, mixed over the plain colours; strengths (--sh-*)
+   are 0 when shades are off. Palette and strengths live in workspace/shades.ts;
+   the block-to-hue mapping is here. */
+
+[data-shade='status'],
+[data-shade='page-setup'],
+[data-shade='runtime'],
+[data-shade='at-a-glance'] {
+	--sh: var(--sh-blue);
+}
+[data-shade='genomes'],
+[data-shade='page-analyze'],
+[data-shade='tools'],
+[data-shade='steps'] {
+	--sh: var(--sh-cyan);
+}
+[data-shade='workflow'],
+[data-shade='page-view'],
+[data-shade='build-recipes'] {
+	--sh: var(--sh-violet);
+}
+[data-shade='run'],
+[data-shade='page-results'],
+[data-shade='results'],
+[data-shade='reference-data'] {
+	--sh: var(--sh-green);
+}
+[data-shade='activity'],
+[data-shade='page-runs'],
+[data-shade='python'] {
+	--sh: var(--sh-amber);
+}
+[data-shade='container-app'],
+[data-shade='page-files'],
+[data-shade='folders'] {
+	--sh: var(--sh-sky);
+}
+[data-shade='licences'] {
+	--sh: var(--sh-rose);
+}
+[data-shade='machine'],
+[data-shade='page-settings'],
+[data-shade='other-folders'] {
+	--sh: var(--sh-slate);
+}
+
+/* Controls follow the block's hue only in vivid; otherwise --sh-accent is 0%. */
+[data-shade] {
+	--mg-accent: color-mix(in srgb, var(--sh, var(--mg-accent-base)) var(--sh-accent), var(--mg-accent-base));
+}
+
+/* Only the head row and its heading take the hue; the card body stays plain. */
+[data-shade] > .mg-card-head {
+	background: color-mix(in srgb, var(--sh, transparent) var(--sh-head), var(--mg-surface-2));
+	border-bottom: 1px solid var(--mg-border);
+}
+[data-shade] > .mg-card-head :where(h2, h2 button) {
+	color: color-mix(in srgb, var(--sh, var(--mg-text)) var(--sh-title), var(--mg-text));
+}
+[data-shade] :where(.rows, .list) > li:hover,
+[data-shade] .setting:hover {
+	background: color-mix(in srgb, var(--sh, transparent) var(--sh-field), transparent);
+}
+[data-shade] .chip {
+	border-color: color-mix(in srgb, var(--sh, var(--mg-border)) calc(var(--sh-rail) / 2), var(--mg-border));
+	background: color-mix(in srgb, var(--sh, transparent) var(--sh-field), var(--mg-surface));
+	color: color-mix(in srgb, var(--sh, var(--mg-text-2)) var(--sh-title), var(--mg-text-2));
+}
+
+/* ---------------------------------------------------------------- colour vision */
+
+/* Applies the VisionFilters.svelte matrices when the root asks (preview.svelte.ts):
+   figures and images are recoloured, and a preview filters the whole page. */
+[data-recolour] :where(img, iframe, video, canvas, object, embed) {
+	filter: url(#mg-recolour);
+}
+[data-preview] {
+	filter: url(#mg-preview);
+}
+
+/* With symbols on, each state word carries one: tick, exclamation, cross or arrow. */
+[data-marks] :is(.cr-tag, .tag):is(.ok, .warn, .danger, .now)::before,
+[data-marks] :is(.status.mg-warn:not(.act), .status.act.mg-warn .said, .why.bad, .mg-danger.said)::before {
+	margin-right: 0.35em;
+	font-weight: 800;
+}
+[data-marks] :is(.cr-tag, .tag).ok::before {
+	content: '✓';
+}
+[data-marks] :is(.cr-tag, .tag).warn::before,
+[data-marks] :is(.status.mg-warn:not(.act), .status.act.mg-warn .said)::before {
+	content: '!';
+}
+[data-marks] :is(.cr-tag, .tag).danger::before,
+[data-marks] .why.bad::before {
+	content: '✕';
+}
+[data-marks] :is(.cr-tag, .tag).now::before {
+	content: '▸';
+}
+/* The readiness line's dot becomes the symbol itself. */
+[data-marks] :is(.line.ok, .warn .head) > .dot {
+	display: inline-grid;
+	place-items: center;
+	width: auto;
+	height: auto;
+	background: none;
+	font-weight: 800;
+}
+[data-marks] .line.ok > .dot::before {
+	content: '✓';
+	color: var(--mg-ok);
+}
+[data-marks] .warn .head > .dot::before {
+	content: '!';
+	color: var(--mg-warn);
+}
+
+/* ---------------------------------------------------------------- arrival */
+
+/* Panels fade in staggered down the page, timed by the shared --mo-* variables. */
+@keyframes mg-rise {
+	from {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+}
+[data-motion]:not([data-motion='off']) :where(.mg-shell .grid, .mg-page) > * {
+	animation: mg-rise var(--mo-3, 260ms) var(--mo-ease, cubic-bezier(0.22, 1, 0.36, 1)) both;
+}
+[data-motion]:not([data-motion='off']) :where(.mg-shell .grid, .mg-page) > :nth-child(2) {
+	animation-delay: 40ms;
+}
+[data-motion]:not([data-motion='off']) :where(.mg-shell .grid, .mg-page) > :nth-child(3) {
+	animation-delay: 80ms;
+}
+[data-motion]:not([data-motion='off']) :where(.mg-shell .grid, .mg-page) > :nth-child(4) {
+	animation-delay: 120ms;
+}
+[data-motion]:not([data-motion='off']) :where(.mg-shell .grid, .mg-page) > :nth-child(n + 5) {
+	animation-delay: 160ms;
+}
+@media (prefers-reduced-motion: reduce) {
+	:where(.mg-shell .grid, .mg-page) > * {
+		animation: none;
+	}
+}

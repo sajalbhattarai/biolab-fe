@@ -1,0 +1,77 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# merops — apptainer recipe (hand-translated from Dockerfile)
+# DIAMOND blastp against MEROPS peptidase database. Built from source.
+# Two-stage: builder compiles DIAMOND, runtime ships only the binary.
+# See LICENSE.md for license terms (DIAMOND: GPL-3.0).
+# ──────────────────────────────────────────────────────────────────────────────
+
+Bootstrap: docker
+From: debian:12-slim
+Stage: builder
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    DIAMOND_VERSION=2.1.9
+
+    apt-get update && apt-get install -y --no-install-recommends \
+            build-essential cmake ca-certificates wget zlib1g-dev \
+     && rm -rf /var/lib/apt/lists/*
+
+    cd /tmp \
+     && wget -q "https://github.com/bbuchfink/diamond/archive/refs/tags/v${DIAMOND_VERSION}.tar.gz" \
+     && tar -xzf "v${DIAMOND_VERSION}.tar.gz" \
+     && cd "diamond-${DIAMOND_VERSION}" \
+     && mkdir build && cd build \
+     && cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local .. \
+     && make -j"$(nproc)" && make install \
+     && cd / && rm -rf /tmp/diamond-2.1.9 /tmp/v2.1.9.tar.gz
+
+Bootstrap: docker
+From: debian:12-slim
+
+%files
+    entrypoint.sh /opt/merops/entrypoint.sh
+    scripts      /opt/merops/
+    LICENSE.md    /opt/merops/LICENSE.md
+    VERSIONS      /opt/merops/VERSIONS
+
+%files from builder
+    /usr/local/bin/diamond /usr/local/bin/diamond
+
+%labels
+    org.opencontainers.image.title         merops
+    org.opencontainers.image.description   "DIAMOND blastp against MEROPS peptidase database (from-source build)"
+    org.opencontainers.image.source        https://github.com/sajalbhattarai/containers
+    org.opencontainers.image.vendor        margie-annotation
+    org.opencontainers.image.licenses      "GPL-3.0-or-later AND CC-BY-4.0"
+    org.opencontainers.image.version       diamond-2.1.9
+
+%environment
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+
+    DIAMOND_VERSION=2.1.9
+
+    apt-get update && apt-get install -y --no-install-recommends \
+            python3 tini bash ca-certificates zlib1g \
+     && rm -rf /var/lib/apt/lists/*
+
+    chmod -R a+rX /opt/merops \
+     && find /opt/merops -type f \( -name '*.sh' -o -name '*.py' \) -exec chmod a+x {} + \
+     && ln -sf /opt/merops/entrypoint.sh /usr/local/bin/run \
+     && mkdir -p /input /output /db
+
+    printf '{\n  "tool": "merops",\n  "diamond_version": "%s",\n  "base_image": "debian:12-slim",\n  "build_date": "%s"\n}\n' \
+            "${DIAMOND_VERSION}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            > /etc/pipeline-build.json
+
+%runscript
+    exec /usr/bin/tini -- /usr/local/bin/run "$@"
