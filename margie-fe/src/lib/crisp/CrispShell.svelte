@@ -4,7 +4,7 @@
 	import { fade, fly } from 'svelte/transition';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronLeft, ChevronRight, History, ChartPie, Dna, Eye, FolderOpen, House, ListChecks, Menu, Package, Palette, Play, SlidersHorizontal, Unplug, X } from 'lucide-svelte';
+	import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronDown, ChevronLeft, ChevronRight, History, ChartPie, Dna, Eye, FolderOpen, House, Info, ListChecks, Menu, Package, Palette, Play, SlidersHorizontal, Unplug, X } from 'lucide-svelte';
 	import RunRing from '$lib/crisp/RunRing.svelte';
 	import AppearanceControls from '$lib/workspace/AppearanceControls.svelte';
 	import GenomeDrop from '$lib/workspace/GenomeDrop.svelte';
@@ -47,6 +47,13 @@
 		{ href: '/crisp/setup', label: 'Install', icon: Package },
 		{ href: '/crisp/settings', label: 'Settings', icon: SlidersHorizontal }
 	];
+	/** The tab bar: the work, in order, then everything else under More. */
+	const MAIN_TABS = ['/crisp/home', '/crisp/genomes', '/crisp', '/crisp/results'];
+	const PRIMARY = MAIN_TABS.map((h) => NAV.find((n) => n.href === h)!);
+	const MORE = NAV.filter((n) => !MAIN_TABS.includes(n.href));
+	let moreOpen = $state(false);
+	/** The page under More that is open now, if any (the More button shows it). */
+	const inMore = $derived(MORE.find((n) => current(n.href)));
 	const path = $derived(page.url.pathname.replace(/\/$/, '') || '/crisp');
 	const current = (href: string) => (href === '/crisp' ? path === '/crisp' : path.startsWith(href));
 	/** The page's own hue, for its eyebrow, the wash behind its head and its
@@ -283,6 +290,12 @@
 			<span class="where">{backend.cluster ? `on the HPC${backend.host ? `, ${backend.host.split('.')[0]}` : ''}` : 'on this computer'}</span>
 		</a>
 		<span class="here">{NAV.find((n) => current(n.href))?.label ?? ''}</span>
+		{#if !ui.guided}
+			<!-- Simple mode: explanations on request. Guided shows them always, so no button. -->
+			<button type="button" class="icon details" aria-pressed={ui.details} title={ui.details ? 'Hide the explanations' : 'Show what things are'} aria-label="Details" onclick={() => (ui.details = !ui.details)}>
+				<Info size={17} />
+			</button>
+		{/if}
 		<!-- back, forward, and the last places -->
 		<div class="hist" role="group" aria-label="Back and forward">
 			<button type="button" class="icon" aria-label="Back" title={at > 0 ? `Back to ${places[at - 1].label}` : 'Back'} disabled={at <= 0} onclick={() => step(-1)}>
@@ -332,11 +345,24 @@
 
 	<!-- The pages, as tabs across the top; on a narrow window the menu button above has them instead. -->
 	<nav class="toptabs" aria-label="MARGIE">
-		{#each NAV as n (n.href)}
+		{#each PRIMARY as n (n.href)}
 			<a href={n.href} aria-current={current(n.href) ? 'page' : undefined} style="--tab: color-mix(in srgb, var(--sh-{PAGE_SHADE[n.href] ?? 'cyan'}) var(--sh-title), var(--mg-accent-base))"
 				><n.icon size={15} /><span>{n.label}</span></a
 			>
 		{/each}
+		<div class="more">
+			<button type="button" class="more-btn" class:on={!!inMore} aria-haspopup="menu" aria-expanded={moreOpen} onclick={() => (moreOpen = !moreOpen)}>
+				{#if inMore}<inMore.icon size={15} /><span>{inMore.label}</span>{:else}<span>More</span>{/if}<ChevronDown size={14} />
+			</button>
+			{#if moreOpen}
+				<button type="button" class="hist-scrim" aria-label="Close" onclick={() => (moreOpen = false)}></button>
+				<ul class="more-menu" role="menu" aria-label="More pages">
+					{#each MORE as n (n.href)}
+						<li><a role="menuitem" href={n.href} aria-current={current(n.href) ? 'page' : undefined} onclick={() => (moreOpen = false)}><n.icon size={16} /><span>{n.label}</span></a></li>
+					{/each}
+				</ul>
+			{/if}
+		</div>
 	</nav>
 
 	{#if pagesOpen}
@@ -408,17 +434,17 @@
 							</Field>
 						{/if}
 	
-						<Field title="Hints">
+						<Field title="Mode">
 							<Seg
-								label="Hints"
+								label="Mode"
 								value={ui.prefs.mode}
 								onpick={(mode) => ui.update({ mode, welcomed: true })}
 								options={[
-									{ value: 'clean', label: 'Clean' },
+									{ value: 'clean', label: 'Simple' },
 									{ value: 'guided', label: 'Guided' }
 								]}
 							/>
-							<span class="note">Guided shows the four steps, from installing to reading the results, and a hint for the page you are on.</span>
+							<span class="note">Simple keeps each page to its controls; the Details button in the top bar shows the explanations when you want them. Guided adds the four steps, a hint for the page you are on, and every explanation.</span>
 						</Field>
 					</section>
 					<AppearanceControls />
@@ -1148,5 +1174,78 @@
 	.disconnect:hover {
 		border-color: var(--mg-danger);
 		color: var(--mg-danger);
+	}
+
+	/* ---- More: the pages beyond the four main tabs ---- */
+	.more {
+		position: relative;
+		display: inline-flex;
+		align-items: stretch;
+	}
+	.more-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+		padding: 0 12px 0 14px;
+		border: none;
+		background: none;
+		color: var(--mg-text-2);
+		font: inherit;
+		font-size: var(--mg-fs-sm);
+		white-space: nowrap;
+		cursor: pointer;
+		transition: color 140ms ease;
+	}
+	.more-btn:hover,
+	.more-btn[aria-expanded='true'] {
+		color: var(--mg-text);
+	}
+	.more-btn.on {
+		color: var(--mg-accent-ink, var(--mg-accent));
+		font-weight: 500;
+		box-shadow: inset 0 -2px 0 var(--mg-accent);
+	}
+	.more-btn:focus-visible {
+		outline: 2px solid var(--mg-accent);
+		outline-offset: -4px;
+		border-radius: var(--mg-r-sm);
+	}
+	.more-menu {
+		position: absolute;
+		z-index: 30;
+		top: calc(100% + 4px);
+		right: 0;
+		min-width: 180px;
+		padding: 6px;
+		margin: 0;
+		list-style: none;
+		border: 1px solid var(--mg-border);
+		border-radius: var(--mg-r);
+		background: var(--mg-surface);
+		box-shadow: var(--cr-pop-shadow);
+	}
+	.more-menu a {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		height: 34px;
+		padding: 0 10px;
+		border-radius: var(--mg-r-sm);
+		color: var(--mg-text);
+		font-size: var(--mg-fs-sm);
+		text-decoration: none;
+	}
+	.more-menu a:hover {
+		background: color-mix(in srgb, var(--mg-text) 6%, transparent);
+	}
+	.more-menu a[aria-current='page'] {
+		color: var(--mg-accent-ink, var(--mg-accent));
+		font-weight: 500;
+	}
+	/* Details: on while the explanations show. */
+	.details[aria-pressed='true'] {
+		border-color: color-mix(in srgb, var(--mg-accent-base) 40%, var(--mg-border));
+		background: color-mix(in srgb, var(--mg-accent-base) 12%, var(--mg-surface));
+		color: var(--mg-accent-ink, var(--mg-accent-base));
 	}
 </style>

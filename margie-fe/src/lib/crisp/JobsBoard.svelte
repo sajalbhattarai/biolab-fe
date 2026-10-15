@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Explain from '$lib/workspace/Explain.svelte';
 	import { Check, ExternalLink, FolderOpen, ScrollText, Square, Trash2, X } from 'lucide-svelte';
 	import '$lib/workspace/viewers/tools.css';
 	import { api, type Run } from '$lib/api';
@@ -74,10 +75,10 @@
 	<div class="board">
 		<div class="list">
 			<div class="toolbar">
-				<span class="mg-note">Pick a job to read its log.</span>
+				<Explain><span class="mg-note">Pick a job to read its log.</span></Explain>
 				<span class="mg-grow"></span>
 				{#if backend.cluster}
-					<span class="mg-note">Kept by the cluster, in your job history.</span>
+					<Explain><span class="mg-note">Kept by the cluster, in your job history.</span></Explain>
 				{:else if asking}
 					<span class="mg-note ask">
 						Clear {ws.runs.length - stillGoing} finished job{ws.runs.length - stillGoing === 1 ? '' : 's'}? A copy is kept in

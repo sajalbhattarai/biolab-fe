@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Explain from '../Explain.svelte';
 	import { Check } from 'lucide-svelte';
 	import type { Snippet } from 'svelte';
 	import { uiBase } from '../base.svelte';
@@ -362,7 +363,7 @@
 					<span class="sp-py-text">
 						{#if o.python.ready}
 							<span class="mg-mono sp-path" title={o.python.path}>{o.python.path}</span>
-							<span class="mg-note">Combines, scores and draws the results.</span>
+							<Explain><span class="mg-note">Combines, scores and draws the results.</span></Explain>
 						{:else if o.python.base}
 							<span class="mg-mono sp-path" title={o.python.base.path}>{o.python.base.path}</span>
 							<span class="mg-note">

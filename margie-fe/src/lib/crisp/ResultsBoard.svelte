@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Explain from '$lib/workspace/Explain.svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { Bot, Check, Copy, Download, FileSpreadsheet, FolderOpen } from 'lucide-svelte';
@@ -345,7 +346,7 @@
 			<header class="rb-head">
 				<div class="rb-title">
 					<h2 id="rb-title">Results folder</h2>
-					<p class="rb-note">Every tool's output and each genome's results, as they are on disk.</p>
+					<Explain><p class="rb-note">Every tool's output and each genome's results, as they are on disk.</p></Explain>
 				</div>
 			</header>
 			<div class="rb-pane rb-flow">

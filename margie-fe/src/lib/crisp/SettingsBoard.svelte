@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Explain from '$lib/workspace/Explain.svelte';
 	import { tick, untrack } from 'svelte';
 	import { beforeNavigate } from '$app/navigation';
 	import { page } from '$app/state';
@@ -579,11 +580,13 @@
 				</header>
 				<Fold id="settings:licences" open={isOpen('licences')}>
 					<div class="sb-lic">
+						<Explain>
 						<p class="sb-desc">
 							These tools carry academic or non-commercial terms, and stay off until you accept them. Read each tool's terms in
 							<a class="mg-link" href="https://github.com/sajalbhattarai/margie-pipeline#8-licence-compliance" target="_blank" rel="noreferrer">README §8</a>
 							first.
 						</p>
+						</Explain>
 
 						<label class="sb-use">
 							<span class="sb-lbl">Intended use</span>

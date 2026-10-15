@@ -7,7 +7,7 @@
 	/**
 	 * Guided mode's step bar: the four steps from setup to a report, each ticked
 	 * when done, the current page marked, and one line on what to do there.
-	 * Clean mode leaves it out.
+	 * Simple mode leaves it out.
 	 */
 	const path = $derived(page.url.pathname.replace(/\/$/, '') || '/crisp');
 

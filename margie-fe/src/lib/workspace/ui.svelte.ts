@@ -4,6 +4,7 @@
  * localStorage and the local server's file (lib/server/ui.ts).
  */
 
+import { HOSTED } from '$lib/hosted';
 import {
 	LAYOUTS,
 	motionScale,
@@ -23,6 +24,8 @@ const PREFS_KEY = 'margie.ui.prefs';
 const DEFAULT_KEY = 'margie.ui.default';
 /** Local server route that keeps both on disk (lib/server/ui.ts). */
 const UI_API = '/api/local/ui';
+/** Hosted: no server file, so browser storage is the only copy (see lib/hosted.ts). */
+const NO_SERVER = HOSTED;
 /** Set once the server's copy has been read in this window. */
 let fromServer = false;
 
@@ -58,6 +61,10 @@ class Ui {
 
 	dark = $derived(this.prefs.theme === 'dark' || (this.prefs.theme === 'system' && this.systemDark));
 	guided = $derived(this.prefs.mode === 'guided');
+	/** Simple mode: explanations shown on request (the Details button), for this window. */
+	details = $state(false);
+	/** Whether explanatory text is shown: always in Guided, on request in Simple (see Explain.svelte). */
+	explain = $derived(this.prefs.mode === 'guided' || this.details);
 	motion = $derived(this.reducedMotion ? 'off' : this.prefs.motion);
 	/** The motion variables as a style string, for any interface's root element. */
 	motionStyle = $derived(styleString(motionVars(this.motion, this.prefs.speed)));
@@ -112,7 +119,7 @@ class Ui {
 		} catch {
 			// Unreadable: the defaults stand.
 		}
-		if (fromServer) return;
+		if (fromServer || NO_SERVER) return;
 		fromServer = true;
 		fetch(UI_API)
 			.then((r) => (r.ok ? r.json() : null))
@@ -135,6 +142,7 @@ class Ui {
 	async checkDefault() {
 		if (this.hasDefault !== null) return;
 		try {
+			if (NO_SERVER) throw new Error('no server');
 			const r = await fetch(UI_API);
 			this.hasDefault = r.ok && Object.keys((await r.json()).default ?? {}).length > 0;
 		} catch {
@@ -158,6 +166,7 @@ class Ui {
 			// The file below keeps it instead.
 		}
 		try {
+			if (NO_SERVER) throw new Error('no server');
 			const r = await fetch(`${UI_API}/default`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prefs: look }) });
 			kept ||= r.ok;
 		} catch {
@@ -172,6 +181,7 @@ class Ui {
 	async resetToDefault() {
 		let look: Partial<UiPrefs> = {};
 		try {
+			if (NO_SERVER) throw new Error('no server');
 			const r = await fetch(UI_API);
 			if (r.ok) look = (await r.json()).default ?? {};
 		} catch {

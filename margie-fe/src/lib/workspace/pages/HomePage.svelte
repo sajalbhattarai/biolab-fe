@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { ArrowRight, ChartPie, Dna, FolderOpen, ListChecks, Maximize2, Package, Play, SlidersHorizontal, X } from 'lucide-svelte';
+	import { ArrowRight, ChartPie, Dna, FolderOpen, Info, ListChecks, Maximize2, Package, Play, SlidersHorizontal, X } from 'lucide-svelte';
+	import Explain from '../Explain.svelte';
 	import { clusterParts } from '$lib/workspace/cluster-parts';
 	import { backend } from '$lib/workspace/backend.svelte';
 	import { uiBase } from '../base.svelte';
@@ -104,9 +105,11 @@
 
 <div class="home">
 	<section class="hero">
-		<p class="house">
-			A Snakemake pipeline in the <a href={BSP} target="_blank" rel="noreferrer">Bioinformatics Supercomputing Platform</a> (BSP)
-		</p>
+		<Explain>
+			<p class="house">
+				A Snakemake pipeline in the <a href={BSP} target="_blank" rel="noreferrer">Bioinformatics Supercomputing Platform</a> (BSP)
+			</p>
+		</Explain>
 		<h1><img class="logo" src="/home/margie-logo.png" alt="MARGIE" width="232" height="232" /></h1>
 		<p class="full">Mostly Automated Rapid Genome Inference Environment</p>
 		<p class="motto">Annotate with confidence: a genome-centric, context-dependent approach</p>
@@ -114,9 +117,13 @@
 			<a class="pill primary" href={uiBase.path}><Play size={15} /> Start annotating</a>
 			<a class="pill" href={uiBase.to('/genomes')}>Add genomes</a>
 			<a class="pill" href={uiBase.to('/results')}>See results</a>
+			{#if !ui.guided}
+				<button type="button" class="pill quiet" aria-pressed={ui.details} onclick={() => (ui.details = !ui.details)}><Info size={15} /> {ui.details ? 'Hide details' : 'Details'}</button>
+			{/if}
 		</div>
 	</section>
 
+	<Explain>
 	<section class="run">
 		<div class="card run-steps">
 			<h2>What a run does</h2>
@@ -138,7 +145,9 @@
 			<figcaption>A map of each genome, coloured by operon, with a report on every gene.</figcaption>
 		</figure>
 	</section>
+	</Explain>
 
+	<Explain>
 	<section class="guide" aria-labelledby="guide-title">
 		<header class="sec-head">
 			<h2 id="guide-title">What each tab does</h2>
@@ -171,6 +180,7 @@
 			</div>
 		{/if}
 	</section>
+	</Explain>
 
 	{#if full}
 		<div class="lightbox" role="dialog" aria-modal="true" aria-label="Genome map, full screen" use:toRoot>
@@ -180,7 +190,7 @@
 		</div>
 	{/if}
 
-	{#if clusterParts.Compute}
+	{#if clusterParts.Compute && ui.explain}
 		<section class="hpc-note" aria-labelledby="hpc-note-t">
 			<h2 id="hpc-note-t">On an HPC: where MARGIE works</h2>
 			<div class="hpc-cols">
@@ -205,6 +215,7 @@
 	{/if}
 
 	<footer class="foot">
+		<Explain>
 		<p>
 			MARGIE is a Snakemake pipeline housed, among other tools, within the Bioinformatics Supercomputing Platform (BSP) developed by
 			Dane Deemer. For BSP's other features, see the
@@ -218,6 +229,7 @@
 			</p>
 			<p class="cite-note">Please also cite each tool and database MARGIE runs; they are listed in the README.</p>
 		</div>
+		</Explain>
 		<p class="links">
 			<a class="pill small" href={BACKEND} target="_blank" rel="noreferrer">Backend</a>
 			<a class="pill small" href={FRONTEND} target="_blank" rel="noreferrer">Frontend</a>
@@ -320,6 +332,21 @@
 		height: 30px;
 		padding: 0 14px;
 		font-size: var(--mg-fs-sm);
+	}
+	/* Details: a quieter pill, lit while the explanations show. */
+	button.pill {
+		font: inherit;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.pill.quiet {
+		border-color: var(--mg-border);
+		color: var(--mg-text-2);
+	}
+	.pill.quiet[aria-pressed='true'] {
+		border-color: color-mix(in srgb, var(--mg-accent) 40%, var(--mg-border));
+		background: color-mix(in srgb, var(--mg-accent) 10%, var(--mg-surface));
+		color: var(--mg-accent-ink, var(--mg-accent));
 	}
 
 	/* ---- hero ---- */
