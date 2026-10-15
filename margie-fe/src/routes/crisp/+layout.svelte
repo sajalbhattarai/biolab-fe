@@ -18,6 +18,7 @@
 	import { backend } from '$lib/workspace/backend.svelte';
 	import { catchDownloads } from '$lib/cluster/downloads';
 	import { ui } from '$lib/workspace/ui.svelte';
+	import { HOSTED } from '$lib/hosted';
 
 	let { children } = $props();
 
@@ -36,6 +37,11 @@
 		addEventListener('pagehide', save);
 		// In cluster mode, file links are intercepted and fetched with the sign-in.
 		backend.refresh();
+		if (HOSTED && !backend.cluster) {
+			// The website has no local mode: nothing to show before signing in.
+			location.replace('/signin');
+			return;
+		}
 		const release = backend.cluster ? catchDownloads() : null;
 		ws.loadAll();
 		ws.startPolling();

@@ -4,6 +4,7 @@
  */
 
 import { browser } from '$app/environment';
+import { HOSTED } from '$lib/hosted';
 
 const TOKEN_KEY = 'bsp_token';
 
@@ -36,7 +37,7 @@ class Backend {
 		} catch {
 			// nothing stored to remove
 		}
-		window.location.assign('/login');
+		window.location.assign(HOSTED ? '/signin' : '/login');
 	}
 
 	/** "this computer" or "the cluster": how a sentence names where work runs. */

@@ -2,6 +2,7 @@
 	import { Laptop } from 'lucide-svelte';
 	import { clearToken, setToken } from '$lib/auth.js';
 	import { getApiUrl } from '$lib/config';
+	import { HOSTED } from '$lib/hosted';
 	import { ui } from '$lib/workspace/ui.svelte';
 
 	let username = $state('');
@@ -44,9 +45,10 @@
 			window.location.assign(ui.home());
 		} catch (e) {
 			if (e instanceof TypeError) {
-				error =
-					`Can't reach the backend at ${apiUrl || window.location.origin}. ` +
-					'Connect to your HPC on the start page first (link below), or run MARGIE on this computer.';
+				error = HOSTED
+					? `Can't reach MARGIE's API at ${apiUrl || window.location.origin}. Try again in a moment.`
+					: `Can't reach the backend at ${apiUrl || window.location.origin}. ` +
+						'Connect to your HPC on the start page first (link below), or run MARGIE on this computer.';
 			} else {
 				error = e instanceof Error ? e.message : 'Login failed. Please try again.';
 			}
@@ -106,6 +108,7 @@
 		No account? <a href="/register" class="text-primary-500 hover:underline">Register</a>
 	</p>
 
+	{#if !HOSTED}
 	<div class="mt-8">
 		<div class="flex items-center gap-3 text-xs uppercase tracking-wide text-surface-500">
 			<span class="flex-1 border-t border-surface-300 dark:border-surface-600"></span>
@@ -130,4 +133,5 @@
 		Not connected to your HPC yet, or setting MARGIE up for the first time?
 		<a href="/start" class="text-primary-500 hover:underline">Choose where MARGIE runs</a>
 	</p>
+	{/if}
 </div>

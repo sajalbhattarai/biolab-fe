@@ -7,6 +7,7 @@ import type { Component } from 'svelte';
 import ClusterSetup from '$lib/cluster/ClusterSetup.svelte';
 import { chatLink, chatRemote } from '$lib/cluster/backend';
 import ComputeToggle from '$lib/cluster/ComputeToggle.svelte';
+import { HOSTED } from '$lib/hosted';
 
 /** A genome's cluster results as genome chat reads them (lib/server/genome-chat's Remote). */
 export interface ChatRemote {
@@ -43,4 +44,7 @@ export const clusterParts: {
 	chat?: { url: string; remote: (genome: string) => Promise<ChatRemote | null>; link?: () => { api: string; token: string } | null };
 	/** Header control in HPC mode choosing where the server runs (login or compute node). */
 	Compute?: Component;
-} = { Compute: ComputeToggle, Setup: ClusterSetup, switchHref: '/start', disconnect, lockApi: '/api/local/install-lock', chat: { url: '/api/local/genome-chat', remote: chatRemote, link: chatLink } };
+} = HOSTED
+	// The website: no start page, tunnel or local chat server; the lock lives in the browser.
+	? { Setup: ClusterSetup, lockApi: '' }
+	: { Compute: ComputeToggle, Setup: ClusterSetup, switchHref: '/start', disconnect, lockApi: '/api/local/install-lock', chat: { url: '/api/local/genome-chat', remote: chatRemote, link: chatLink } };

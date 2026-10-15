@@ -3,6 +3,7 @@
  * here and sends the browser to the sign-in page.
  */
 
+import { HOSTED } from '$lib/hosted';
 import { goto } from '$app/navigation';
 import { ApiError } from '$lib/api';
 import { authHeaders, clearToken } from '$lib/auth';
@@ -21,7 +22,7 @@ function detailOf(data: unknown): string | null {
 function signedOut(): never {
 	clearToken();
 	backend.refresh();
-	goto('/login');
+	goto(HOSTED ? '/signin' : '/login');
 	throw new ApiError('Your sign-in has ended. Sign in again to reach the cluster.', 401);
 }
 

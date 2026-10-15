@@ -8,6 +8,7 @@
 	import { backend } from '$lib/workspace/backend.svelte';
 	import { isLoggedIn } from '$lib/auth.js';
 	import { useClusterBackend } from '$lib/config';
+	import { HOSTED } from '$lib/hosted';
 	import { ui } from '$lib/workspace/ui.svelte';
 
 	let { children } = $props();
@@ -31,9 +32,10 @@
 
 	// /crisp (Modern) runs the pipeline locally with no account; /app and /atlas
 	// redirect there. /start chooses where MARGIE runs and begins HPC sign-in.
-	const PUBLIC_PATHS = ['/login', '/register', '/start', '/crisp', '/app', '/atlas'];
+	// Hosted (the website): every page needs a signed-in cluster account.
+	const PUBLIC_PATHS = HOSTED ? ['/signin'] : ['/login', '/register', '/start', '/crisp', '/app', '/atlas'];
 	/** Pages that bring their own chrome: this shell would be a second one. */
-	const OWN_SHELL = ['/start', '/crisp'];
+	const OWN_SHELL = ['/start', '/crisp', '/signin'];
 	const bare = $derived(OWN_SHELL.some((p) => page.url.pathname.startsWith(p)));
 	/** True while / redirects to this browser's chosen interface. */
 	let leaving = $state(false);
@@ -42,8 +44,12 @@
 		// Clears stored settings that pointed at a local backend (now /crisp).
 		useClusterBackend();
 		const path = window.location.pathname;
+		if (HOSTED && ['/start', '/login', '/register'].some((p) => path.startsWith(p))) {
+			location.replace('/signin');
+			return;
+		}
 		if (!PUBLIC_PATHS.some(p => path.startsWith(p)) && !isLoggedIn()) {
-			goto('/login');
+			goto(HOSTED ? '/signin' : '/login');
 			return;
 		}
 		// The front page redirects to the interface chosen in Customize (Modern by default).

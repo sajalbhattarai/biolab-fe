@@ -5,12 +5,15 @@
  */
 
 import { browser } from '$app/environment';
+import { HOSTED } from '$lib/hosted';
 
 export type BackendMode = 'cluster' | 'local';
 
 const MODE_KEY = 'margie_mode';
 /** Keys from an older version of this app, cleared when seen. */
 const STALE_KEYS = ['margie_local_api', 'margie_local_backend_path'];
+/** Hosted: an API address given as ?api=https://... on any page, kept for this browser. */
+const API_OVERRIDE_KEY = 'margie_api_url';
 
 function read(key: string): string | null {
 	try {
@@ -30,6 +33,12 @@ function write(key: string, value: string | null): void {
 }
 
 function clusterApiUrl(): string {
+	if (HOSTED) {
+		const given = new URLSearchParams(window.location.search).get('api');
+		if (given) write(API_OVERRIDE_KEY, /^https?:\/\/\S+$/.test(given) ? given.replace(/\/+$/, '') : null);
+		const kept = read(API_OVERRIDE_KEY);
+		if (kept) return kept;
+	}
 	const fromEnv = import.meta.env.VITE_PUBLIC_API_URL as string | undefined;
 	if (fromEnv) return fromEnv;
 	return ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname)

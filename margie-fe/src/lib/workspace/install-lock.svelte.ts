@@ -4,8 +4,21 @@
  * installation asks for the password again via confirm() and InstallGate.
  */
 
+import { HOSTED } from '$lib/hosted';
 import { backend } from './backend.svelte';
 import { clusterParts } from './cluster-parts';
+import { INSTALL_STATEMENT, normaliseStatement } from './install-statement';
+
+/** Hosted: places unlocked in this browser (the site has no server to keep them). */
+const UNLOCKED_KEY = 'margie_install_unlocked';
+function browserPlaces(): string[] {
+	try {
+		const v = JSON.parse(localStorage.getItem(UNLOCKED_KEY) ?? '[]');
+		return Array.isArray(v) ? v.filter((p) => typeof p === 'string') : [];
+	} catch {
+		return [];
+	}
+}
 
 class InstallLock {
 	unlocked = $state(false);
@@ -27,6 +40,11 @@ class InstallLock {
 		if (!place || place === this.#asked) return;
 		this.#asked = place;
 		this.known = false;
+		if (HOSTED) {
+			this.unlocked = browserPlaces().includes(place);
+			this.known = true;
+			return;
+		}
 		try {
 			const r = await fetch(`${clusterParts.lockApi}?place=${encodeURIComponent(place)}`);
 			this.unlocked = r.ok && !!(await r.json()).unlocked;
@@ -54,6 +72,17 @@ class InstallLock {
 	async unlock(password: string): Promise<string> {
 		const place = this.place;
 		if (!place) return 'Still reaching the cluster; try again in a moment.';
+		if (HOSTED) {
+			if (normaliseStatement(password) !== normaliseStatement(INSTALL_STATEMENT)) return 'That does not match the statement. Type it exactly as shown.';
+			try {
+				localStorage.setItem(UNLOCKED_KEY, JSON.stringify([...new Set([...browserPlaces(), place])]));
+			} catch {
+				// Not remembered: the next installation asks again.
+			}
+			this.unlocked = true;
+			this.known = true;
+			return '';
+		}
 		try {
 			const r = await fetch(clusterParts.lockApi, {
 				method: 'POST',
