@@ -118,7 +118,7 @@
 			<a class="pill" href={uiBase.to('/genomes')}>Add genomes</a>
 			<a class="pill" href={uiBase.to('/results')}>See results</a>
 			{#if !ui.guided}
-				<button type="button" class="pill quiet" aria-pressed={ui.details} onclick={() => (ui.details = !ui.details)}><Info size={15} /> {ui.details ? 'Hide details' : 'Details'}</button>
+				<button type="button" class="pill quiet" aria-pressed={ui.details} onclick={() => (ui.details = !ui.details)}><Info size={15} /> {ui.details ? 'Show less' : 'Learn more'}</button>
 			{/if}
 		</div>
 	</section>

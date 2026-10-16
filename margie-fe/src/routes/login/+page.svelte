@@ -46,7 +46,7 @@
 		} catch (e) {
 			if (e instanceof TypeError) {
 				error = HOSTED
-					? `Can't reach MARGIE's API at ${apiUrl || window.location.origin}. Try again in a moment.`
+					? `Can't reach the server at ${apiUrl || window.location.origin}.`
 					: `Can't reach the backend at ${apiUrl || window.location.origin}. ` +
 						'Connect to your HPC on the start page first (link below), or run MARGIE on this computer.';
 			} else {

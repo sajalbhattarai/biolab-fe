@@ -59,7 +59,7 @@
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ username, password })
 		});
-		if (res.status === 401) throw new Error('That username and password did not match an account.');
+		if (res.status === 401) throw new Error('Wrong username or password.');
 		if (!res.ok) throw new Error(describe((await res.json().catch(() => ({}))).detail, `Could not sign in (${res.status}).`));
 		setToken((await res.json()).access_token);
 		ui.restore();
@@ -85,7 +85,7 @@
 			if (mode === 'signin') await signIn();
 			else await createAccount();
 		} catch (e) {
-			problem = e instanceof TypeError ? `Can't reach MARGIE's API at ${getApiUrl() || location.origin}. Try again in a moment.` : e instanceof Error ? e.message : String(e);
+			problem = e instanceof TypeError ? `Can't reach the server at ${getApiUrl() || location.origin}.` : e instanceof Error ? e.message : String(e);
 		} finally {
 			busy = false;
 		}
@@ -111,12 +111,12 @@
 	<main class="content">
 		<div class="page">
 			<header class="st-head">
-				<h1 class="cr-title">{mode === 'signin' ? 'Sign in' : 'Create your account'}</h1>
-				<p class="cr-lede">MARGIE runs your analyses on your HPC cluster through SSH. Sign in to open it.</p>
+				<h1 class="cr-title">{mode === 'signin' ? 'Sign in' : 'New account'}</h1>
+				<p class="cr-lede">Sign in to run MARGIE on your cluster.</p>
 			</header>
 
 			<section class="card">
-				<header class="card-head"><h2><span class="num"><Server size={14} /></span>Your account</h2></header>
+				<header class="card-head"><h2><span class="num"><Server size={14} /></span>Account</h2></header>
 				<div class="card-body">
 					<div class="tabs" role="tablist" aria-label="Account">
 						<button type="button" role="tab" aria-selected={mode === 'signin'} onclick={() => (mode = 'signin')}>Sign in</button>
@@ -138,7 +138,7 @@
 								<input class="mg-input" type="password" bind:value={password} autocomplete={mode === 'signin' ? 'current-password' : 'new-password'} required />
 							</label>
 							{#if mode === 'create'}
-								<p class="hint span">A MARGIE account, separate from your cluster login. Jobs run on the cluster as the account below, over SSH with the key you paste.</p>
+								<p class="hint span">This is your MARGIE login. Jobs run on the cluster under the cluster account below.</p>
 								<label class="field">
 									<span class="label">Cluster address</span>
 									<input class="mg-input" bind:value={clusterHost} placeholder="negishi.rcac.purdue.edu" spellcheck="false" required />
@@ -150,21 +150,21 @@
 								<label class="field span">
 									<span class="label">SSH private key</span>
 									<textarea class="mg-input mono" rows="5" bind:value={privateKey} placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" spellcheck="false" required></textarea>
-									<span class="hint">Its public half must already be in the cluster account's ~/.ssh/authorized_keys. The key is stored encrypted and never shown again.</span>
+									<span class="hint">Paste a private key whose public key is already in ~/.ssh/authorized_keys on the cluster. It is stored encrypted.</span>
 								</label>
 							{/if}
 						</div>
 						<div class="acts">
 							<button type="submit" class="mg-btn primary" disabled={!canSubmit || busy}>
 								{#if busy}<LoaderCircle size={15} class="spin" />{/if}
-								{mode === 'signin' ? 'Sign in' : 'Create account and sign in'}
+								{mode === 'signin' ? 'Sign in' : 'Create account'}
 							</button>
 						</div>
 					</form>
 				</div>
 			</section>
 
-			<p class="foot">Prefer to run MARGIE on your own computer? Install the desktop app, or use the <code>margie</code> command.</p>
+			<p class="foot">Want to run MARGIE on your own computer? Get the desktop app, or use the <code>margie</code> command.</p>
 		</div>
 	</main>
 </div>
