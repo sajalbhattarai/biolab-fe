@@ -397,7 +397,9 @@ which margie-backend commit they come from and how to refresh them.
 
 Scoring reads operon's results, so `operon` always runs. The fingerprint databases and the operon
 reference grow with every genome annotated and are kept in `MARGIE_SHARED_DIR`
-(default `db/margie-shared/`), the local counterpart of margie-backend's depot files. After the last
+(default `db/margie-shared/`), the local counterpart of margie-backend's depot files. The first run
+starts the operon reference from the 29-genome starter shipped as
+`processing/host-scripts/scoring/reference/operon-db.pkl` (what it holds is in the manifest beside it). After the last
 genome, each genome folder is reduced to its FINAL table, an Excel copy, `diagrams/` and
 `per-tool-phased-output/`, as margie-backend does.
 
