@@ -82,6 +82,11 @@
 	let hpcAddr = $state('');
 	let backendDir = $state('');
 	let dirTouched = $state(false);
+	// The group's shared MARGIE folder on the HPC and the two values beside it; the
+	// server needs them to copy the base databases for a new account.
+	let sharedRoot = $state('');
+	let licenceDir = $state('');
+	let operator = $state('');
 	let answer = $state('');
 	let reveal = $state(false);
 	let restartOpen = $state(false);
@@ -103,7 +108,11 @@
 	async function connect(mode: 1 | 2 = 1) {
 		restartOpen = false;
 		if (connecting || connected) await act('hpc-stop', {}, 'stop');
-		await act('hpc-start', { host, backendDir: backendDir.trim(), mode }, 'connect');
+		await act(
+			'hpc-start',
+			{ host, backendDir: backendDir.trim(), mode, sharedRoot: sharedRoot.trim(), licenceRecordsDir: licenceDir.trim(), operator: operator.trim() },
+			'connect'
+		);
 	}
 
 	async function send(cancel = false) {
@@ -236,6 +245,9 @@
 			if (s.backendDir) {
 				backendDir = s.backendDir;
 				dirTouched = true;
+				sharedRoot = s.sharedRoot;
+				licenceDir = s.licenceRecordsDir;
+				operator = s.operator;
 			}
 			if (s.sshKey) keyPath = s.sshKey;
 			pipelineDir = s.pipelineRoot;
@@ -544,8 +556,8 @@
 						<button type="button" class="adv-toggle" aria-expanded={advancedOpen} onclick={() => (advancedOpen = !advancedOpen)}>
 							<ChevronRight size={16} class="chev" />
 							<span>Advanced settings</span>
-							<span class="adv-sum" class:warn={unpushed}>
-								{#if unpushed}Backend changes not on GitHub{:else}{backendDir}{/if}
+							<span class="adv-sum" class:warn={unpushed || !sharedRoot.trim()}>
+								{#if unpushed}Backend changes not on GitHub{:else if !sharedRoot.trim()}Group folder not set{:else}{backendDir}{/if}
 							</span>
 						</button>
 						{#if advancedOpen}
@@ -561,6 +573,22 @@
 											spellcheck="false"
 										/>
 										<span class="hint">Cloned from GitHub if it is not there yet.</span>
+									</label>
+
+									<label class="field">
+										<span class="label">Group folder on the HPC</span>
+										<input class="mg-input mono" bind:value={sharedRoot} placeholder="/depot/mygroup/data/margie" spellcheck="false" />
+										<span class="hint">Your group's shared MARGIE folder: the base databases and containers a new account starts from. Ask whoever set MARGIE up for your group.</span>
+									</label>
+									<label class="field">
+										<span class="label">Licence records folder</span>
+										<input class="mg-input mono" bind:value={licenceDir} placeholder="/depot/mygroup/data/margie/licensing-records" spellcheck="false" />
+										<span class="hint">Where a copy of each licence acceptance is kept for the group. Optional.</span>
+									</label>
+									<label class="field">
+										<span class="label">Group operator</span>
+										<input class="mg-input" bind:value={operator} placeholder="account that maintains the group folder" spellcheck="false" />
+										<span class="hint">Named in the licence records. Optional.</span>
 									</label>
 
 									<div class="field">

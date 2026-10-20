@@ -67,7 +67,13 @@ export const POST: RequestHandler = async ({ request, url }) => {
 				const backendDir = str(body.backendDir);
 				if (!validHost(host)) error(400, 'The HPC login should look like you@cluster.address.');
 				if (!validRemotePath(backendDir)) error(400, 'The backend folder should be a full path on the HPC, starting with /.');
-				writeSettings({ target: 'hpc', hpcHost: host, backendDir });
+				const sharedRoot = str(body.sharedRoot);
+				const licenceRecordsDir = str(body.licenceRecordsDir);
+				const operator = str(body.operator, 64);
+				if (sharedRoot && !validRemotePath(sharedRoot)) error(400, 'The group folder should be a full path on the HPC, starting with /.');
+				if (licenceRecordsDir && !validRemotePath(licenceRecordsDir)) error(400, 'The licence records folder should be a full path on the HPC, starting with /.');
+				if (operator && !/^[A-Za-z0-9_.-]{1,64}$/.test(operator)) error(400, 'The group operator should be an account name: letters, digits, _ . -');
+				writeSettings({ target: 'hpc', hpcHost: host, backendDir, sharedRoot, licenceRecordsDir, operator });
 				const source = await sourceStatus();
 				startHpc({
 					host,
