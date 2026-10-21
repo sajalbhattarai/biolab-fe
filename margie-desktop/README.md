@@ -118,6 +118,15 @@ What differs from the Mac, and why:
   unpacks everything except `MARGIE.exe` and the DLLs. The ARM64 zip works.
 - **Unsigned.** Windows SmartScreen warns on first run until the app is signed.
 
+## Linux
+
+`npm run dist:linux` builds a `.deb` (Debian, Ubuntu) and an AppImage, each for x64 and ARM64.
+The app runs as on the Mac: the pipeline runs on this computer with Docker, Podman or
+Apptainer, or on the HPC through ssh. Writable files go where Electron puts them on Linux
+(`~/.config/MARGIE`, logs under it); `~/.config/margie/margie.env` is shared with the `margie`
+launcher as everywhere else. The Linux builds have so far been produced on macOS and not yet
+tried on a Linux desktop.
+
 ## Signing and notarization
 
 `electron-builder.yml` ships with `notarize: false`, so a local build works with no Apple

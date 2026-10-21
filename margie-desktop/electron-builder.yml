@@ -124,6 +124,25 @@ nsis:
   allowToChangeInstallationDirectory: true
   artifactName: MARGIE-${version}-${arch}-setup.${ext}
 
+# Linux: a .deb for Debian and Ubuntu, and an AppImage that runs anywhere, for
+# x64 and ARM64 PCs. The pipeline runs natively here (Docker, Podman or Apptainer);
+# the launcher scripts are the same bash scripts the Mac uses.
+linux:
+  category: Science
+  icon: build/icon.png
+  maintainer: Sajal Bhattarai
+  synopsis: Annotate prokaryotic genomes on this computer or on your HPC cluster
+  target:
+    - target: deb
+      arch: [x64, arm64]
+    - target: AppImage
+      arch: [x64, arm64]
+  artifactName: MARGIE-${version}-${arch}.${ext}
+
+deb:
+  # The installer's own dependencies; the pipeline's container runtime is checked in the app.
+  depends: [libgtk-3-0, libnotify4, libnss3, libxss1, libxtst6, xdg-utils, libatspi2.0-0, libuuid1, libsecret-1-0]
+
 dmg:
   title: MARGIE ${version}
   artifactName: MARGIE-${version}-${arch}.${ext}

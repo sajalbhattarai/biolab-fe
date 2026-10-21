@@ -1,7 +1,7 @@
 {
 	"name": "margie-desktop",
 	"productName": "MARGIE",
-	"version": "1.3.4",
+	"version": "1.3.5",
 	"description": "MARGIE as a native macOS application: run analyses on this computer or on your HPC cluster.",
 	"private": true,
 	"type": "module",
@@ -19,7 +19,9 @@
 		"dist:arm64": "npm run stage && npm run icon && electron-builder --mac --arm64",
 		"dist:x64": "npm run stage && npm run icon && electron-builder --mac --x64",
 		"dist:win": "npm run stage && npm run icon && electron-builder --win",
-		"pack": "npm run stage && npm run icon && electron-builder --mac --dir"
+		"pack": "npm run stage && npm run icon && electron-builder --mac --dir",
+		"dist:linux": "npm run stage && npm run icon && electron-builder --linux",
+		"dist:all": "npm run stage && npm run icon && electron-builder --mac --win --linux"
 	},
 	"devDependencies": {
 		"electron": "^44.4.4",
