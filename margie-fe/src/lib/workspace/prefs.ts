@@ -142,7 +142,7 @@ export const DEFAULT_PREFS: UiPrefs = {
 	textSize: 'm',
 	textScale: 1,
 	fieldScale: 1,
-	typeface: 'helvetica',
+	typeface: 'arial',
 	monoface: 'menlo',
 	motion: 'full',
 	speed: 1,
@@ -274,7 +274,8 @@ export function sanitizePrefs(raw: unknown, base: UiPrefs = DEFAULT_PREFS): UiPr
 		// A file with only S, M or L starts the slider at that step.
 		textScale: scaleOf(r.textScale, 0.8, 1.5, TEXT_STEPS[oneOf(r.textSize, ['s', 'm', 'l'] as const, 'm')] ?? base.textScale),
 		fieldScale: scaleOf(r.fieldScale, 0.8, 1.6, base.fieldScale),
-		typeface: oneOf(r.typeface, TYPEFACES, base.typeface),
+		// Helvetica Neue was the default before Arial; a saved 'helvetica' is the old default, not a choice.
+		typeface: oneOf(r.typeface === 'helvetica' ? 'arial' : r.typeface, TYPEFACES, base.typeface),
 		monoface: oneOf(r.monoface, TYPEFACES, base.monoface),
 		motion: oneOf(r.motion, ['full', 'subtle', 'off'] as const, base.motion),
 		speed: oneOf(r.speed, SPEEDS, base.speed),

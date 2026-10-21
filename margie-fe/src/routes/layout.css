@@ -13,6 +13,9 @@
 /* Global type scale: a 15px root shrinks the rem-based Tailwind sizes by one
    point; text-xs stays pinned at 12px. */
 html { font-size: 15px; }
+/* Arial everywhere: the pages' own text and Skeleton's components (its theme sets system-ui). */
+:root { --base-font-family: Arial, 'Helvetica Neue', Helvetica, 'Liberation Sans', sans-serif; }
+html, body { font-family: Arial, 'Helvetica Neue', Helvetica, 'Liberation Sans', sans-serif; }
 .text-xs { font-size: 12px; line-height: 1.35; }
 
 :root {
