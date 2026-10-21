@@ -136,7 +136,7 @@ export const DEFAULT_PREFS: UiPrefs = {
 	mode: 'clean',
 	welcomed: false,
 	theme: 'system',
-	accent: 'teal',
+	accent: 'blue',
 	radius: 6,
 	density: 'comfortable',
 	textSize: 'm',

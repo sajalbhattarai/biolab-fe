@@ -324,46 +324,9 @@ textarea.mg-input { height: auto; padding: 8px; resize: vertical; line-height: 1
    are 0 when shades are off. Palette and strengths live in workspace/shades.ts;
    the block-to-hue mapping is here. */
 
-[data-shade='status'],
-[data-shade='page-setup'],
-[data-shade='runtime'],
-[data-shade='at-a-glance'] {
+/* Every block takes the same blue: one faint colour everywhere a tint is drawn. */
+[data-shade] {
 	--sh: var(--sh-blue);
-}
-[data-shade='genomes'],
-[data-shade='page-analyze'],
-[data-shade='tools'],
-[data-shade='steps'] {
-	--sh: var(--sh-cyan);
-}
-[data-shade='workflow'],
-[data-shade='page-view'],
-[data-shade='build-recipes'] {
-	--sh: var(--sh-violet);
-}
-[data-shade='run'],
-[data-shade='page-results'],
-[data-shade='results'],
-[data-shade='reference-data'] {
-	--sh: var(--sh-green);
-}
-[data-shade='activity'],
-[data-shade='page-runs'],
-[data-shade='python'] {
-	--sh: var(--sh-amber);
-}
-[data-shade='container-app'],
-[data-shade='page-files'],
-[data-shade='folders'] {
-	--sh: var(--sh-sky);
-}
-[data-shade='licences'] {
-	--sh: var(--sh-rose);
-}
-[data-shade='machine'],
-[data-shade='page-settings'],
-[data-shade='other-folders'] {
-	--sh: var(--sh-slate);
 }
 
 /* Controls follow the block's hue only in vivid; otherwise --sh-accent is 0%. */

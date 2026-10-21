@@ -1,6 +1,8 @@
 /**
- * Shades: one hue per kind of block (genomes cyan, setup blue, results green...)
- * in every interface, mixed over the plain colours so strength 0 is the plain page.
+ * Shades: the faint colour washed over block heads, rails and page titles,
+ * mixed over the plain colours so strength 0 is the plain page. Every block
+ * and page uses the same blue (workspace.css maps them); the other hues stay
+ * for colour-vision palettes.
  */
 
 /** Hue per name: [light page, dark page], legible as title text and distinct in both themes. */
@@ -52,14 +54,14 @@ export type ShadeLevel = keyof typeof SHADE_LEVELS;
 
 /** Hue per page, read by top bars to colour the current page's underline (blocks map theirs in workspace.css). */
 export const PAGE_SHADE: Record<string, keyof typeof SHADES> = {
-	// In the order of the tabs, round the colour wheel: teal to amber.
-	'/crisp/home': 'teal',
-	'/crisp': 'cyan',
+	// One blue for every page: the same faint colour wherever a tint is drawn.
+	'/crisp/home': 'blue',
+	'/crisp': 'blue',
 	'/crisp/genomes': 'blue',
-	'/crisp/results': 'indigo',
-	'/crisp/files': 'violet',
-	'/crisp/view': 'violet',
-	'/crisp/runs': 'plum',
-	'/crisp/setup': 'rose',
-	'/crisp/settings': 'amber'
+	'/crisp/results': 'blue',
+	'/crisp/files': 'blue',
+	'/crisp/view': 'blue',
+	'/crisp/runs': 'blue',
+	'/crisp/setup': 'blue',
+	'/crisp/settings': 'blue'
 };

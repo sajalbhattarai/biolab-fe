@@ -16,11 +16,11 @@ html { font-size: 15px; }
 .text-xs { font-size: 12px; line-height: 1.35; }
 
 :root {
-	--app-bg-a: #f7fbf8;
-	--app-bg-b: #eef6ff;
-	--app-ink: #112120;
-	--app-accent: #0f766e;
-	--app-accent-2: #f59e0b;
+	--app-bg-a: #f8fafd;
+	--app-bg-b: #eef3fc;
+	--app-ink: #111827;
+	--app-accent: #2563eb;
+	--app-accent-2: #2563eb;
 }
 
 html,
@@ -32,15 +32,15 @@ body {
 	/* Uses Skeleton's surface tokens so body text follows dark mode (this rule loads after Skeleton's). */
 	color: var(--app-ink);
 	background:
-		radial-gradient(1200px 550px at 0% 0%, rgba(15, 118, 110, 0.08), transparent 60%),
-		radial-gradient(900px 500px at 100% 0%, rgba(245, 158, 11, 0.08), transparent 55%),
+		radial-gradient(1200px 550px at 0% 0%, rgba(37, 99, 235, 0.07), transparent 60%),
+		radial-gradient(900px 500px at 100% 0%, rgba(37, 99, 235, 0.05), transparent 55%),
 		linear-gradient(180deg, var(--app-bg-a), var(--app-bg-b));
 
 	@variant dark {
 		color: var(--color-surface-50);
 		background:
-			radial-gradient(1200px 550px at 0% 0%, rgba(45, 212, 191, 0.10), transparent 60%),
-			radial-gradient(900px 500px at 100% 0%, rgba(245, 158, 11, 0.08), transparent 55%),
+			radial-gradient(1200px 550px at 0% 0%, rgba(127, 168, 255, 0.10), transparent 60%),
+			radial-gradient(900px 500px at 100% 0%, rgba(127, 168, 255, 0.06), transparent 55%),
 			linear-gradient(180deg, var(--color-surface-950), var(--color-surface-900));
 	}
 }
@@ -152,6 +152,6 @@ samp,
 }
 
 .beta-strip {
-	border: 1px solid rgba(15, 118, 110, 0.2);
-	background: linear-gradient(90deg, rgba(15, 118, 110, 0.09), rgba(245, 158, 11, 0.08));
+	border: 1px solid rgba(37, 99, 235, 0.2);
+	background: linear-gradient(90deg, rgba(37, 99, 235, 0.09), rgba(37, 99, 235, 0.05));
 }
