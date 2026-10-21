@@ -1,7 +1,7 @@
 {
 	"name": "margie-desktop",
 	"productName": "MARGIE",
-	"version": "1.3.8",
+	"version": "1.3.9",
 	"description": "MARGIE as a native macOS application: run analyses on this computer or on your HPC cluster.",
 	"private": true,
 	"type": "module",

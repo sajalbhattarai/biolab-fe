@@ -556,8 +556,8 @@
 						<button type="button" class="adv-toggle" aria-expanded={advancedOpen} onclick={() => (advancedOpen = !advancedOpen)}>
 							<ChevronRight size={16} class="chev" />
 							<span>Advanced settings</span>
-							<span class="adv-sum" class:warn={unpushed || !sharedRoot.trim()}>
-								{#if unpushed}Backend changes not on GitHub{:else if !sharedRoot.trim()}Group folder not set{:else}{backendDir}{/if}
+							<span class="adv-sum" class:warn={unpushed}>
+								{#if unpushed}Backend changes not on GitHub{:else}{backendDir}{/if}
 							</span>
 						</button>
 						{#if advancedOpen}
@@ -576,9 +576,9 @@
 									</label>
 
 									<label class="field">
-										<span class="label">Group folder on the HPC</span>
+										<span class="label">Group folder on the HPC (optional)</span>
 										<input class="mg-input mono" bind:value={sharedRoot} placeholder="/depot/mygroup/data/margie" spellcheck="false" />
-										<span class="hint">Your group's shared MARGIE folder: the base databases and containers a new account starts from. Ask whoever set MARGIE up for your group.</span>
+										<span class="hint">If your group shares a MARGIE folder, its databases and containers are found under it. Without one, your first run starts from MARGIE's own defaults. Each path can also be set in Settings, Databases.</span>
 									</label>
 									<label class="field">
 										<span class="label">Licence records folder</span>

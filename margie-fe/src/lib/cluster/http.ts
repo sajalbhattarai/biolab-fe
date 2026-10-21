@@ -42,14 +42,24 @@ export async function fetchRaw(path: string): Promise<Response> {
 /** Sends a JSON request and returns the parsed body; throws ApiError on failure. */
 export async function call<T = any>(method: string, path: string, body?: unknown): Promise<T> {
 	let res: Response;
-	try {
-		res = await fetch(`${getApiUrl()}${path}`, {
+	const send = () =>
+		fetch(`${getApiUrl()}${path}`, {
 			method,
 			headers: authHeaders(),
 			body: body === undefined ? undefined : JSON.stringify(body)
 		});
-	} catch {
-		throw new ApiError('MARGIE’s API cannot be reached. Is it running, and is the tunnel to it open?', 503);
+	try {
+		try {
+			res = await send();
+		} catch (first) {
+			// A tunnel refuses a connection now and then; one retry covers that. A repeat is reported.
+			if (method !== 'GET') throw first;
+			await new Promise((r) => setTimeout(r, 400));
+			res = await send();
+		}
+	} catch (e) {
+		const why = e instanceof Error && e.message && e.message !== 'Failed to fetch' ? ` (${e.message})` : '';
+		throw new ApiError(`MARGIE’s API at ${getApiUrl() || location.origin} did not answer ${method} ${path}${why}. Is the HPC still connected? Reconnect from the start page.`, 503);
 	}
 	if (res.status === 401) signedOut();
 	const data = await res.json().catch(() => ({}));

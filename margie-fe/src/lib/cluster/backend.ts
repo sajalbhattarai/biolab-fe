@@ -706,7 +706,7 @@ const humanize = (s: string) => s.replace(/_/g, ' ').replace(/^\w/, (c) => c.toU
 /** Returns a setting's label and Settings group from its config key. */
 function describeParam(p: Param, toolLabel: Map<string, string>): { label: string; group: string } {
 	const key = p.param;
-	if (key === 'main_database') return { label: 'Job history database', group: 'Cluster' };
+	if (key === 'main_database') return { label: 'MARGIE database (SQLite)', group: 'Databases' };
 	if (key.startsWith('compute.cluster_default.')) {
 		const k = key.slice('compute.cluster_default.'.length);
 		return { label: COMPUTE[k] ?? humanize(k), group: 'Cluster' };
@@ -737,7 +737,7 @@ async function settingsList(): Promise<{ settings: Setting[] }> {
 	const [w, cfg] = await Promise.all([workflow(), config.get()]);
 	const toolLabel = new Map(w.tools.filter((t) => t.key).map((t) => [t.key as string, t.name]));
 	const params: Param[] = [
-		{ param: 'main_database', default: '', description: 'The SQLite file on the cluster where your runs and cached results are kept.', type: 'path' },
+		{ param: 'main_database', default: '', description: 'The main MARGIE database on the cluster: every run’s results, cached tool outputs and the job history.', type: 'path' },
 		...w.configurable_params
 	];
 	const settings: Setting[] = params.map((p) => {
