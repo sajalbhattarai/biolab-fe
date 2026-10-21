@@ -467,8 +467,8 @@ rm -rf "$tmp"
 EOF
     CHANGED="yes"; CODE_STATE="fresh"
 elif [ "$kind" = backend ] && [ -z "$KEEP" ]; then
-    # Compares the HPC copy with GitHub's branch and offers a fast-forward update
-    # (automatic in mode 2); a copy with uncommitted changes is left alone.
+    # Compares the HPC copy with GitHub's branch and fast-forwards it when behind;
+    # a copy with uncommitted changes is left alone.
     head="$(got head)"
     branch_now="$(got branch)"
     remote_sha="$(remote_sh "$BACKEND_DIR" "$BACKEND_BRANCH" <<'EOF'
@@ -484,9 +484,14 @@ EOF
     elif [ -n "$(got dirty)" ]; then
         row "update" "skipped: the copy on the HPC has uncommitted changes of its own"; CODE_STATE="dirty"
     else
-        if [ "$UPDATE" != yes ]; then
-            UPDATE="$(ask update-backend "The backend on the HPC is not what GitHub has (it is at ${head:0:9} on $branch_now; GitHub's $BACKEND_BRANCH is at ${remote_sha:0:9}).
-Update it now? MARGIE's server restarts on the new code. Jobs already running are not stopped, but steps they start from now on use the new code." "yes=Update it|no=Not now" no)"
+        # Always brought up to date: a fast-forward and a server restart stop no running job
+        # (steps they start from now on use the new code). MARGIE_NO_UPDATE=1 keeps the old copy.
+        if [ "${MARGIE_NO_UPDATE:-}" = 1 ]; then
+            row "update" "skipped (MARGIE_NO_UPDATE=1): the HPC is at ${head:0:9}, GitHub's $BACKEND_BRANCH at ${remote_sha:0:9}"
+            UPDATE="no"
+        else
+            row "update" "the HPC is at ${head:0:9}; GitHub's $BACKEND_BRANCH is at ${remote_sha:0:9} -- updating"
+            UPDATE="yes"
         fi
         if [ "$UPDATE" = yes ]; then
             mark "step prepare Updating MARGIE's backend on the cluster"
@@ -516,7 +521,7 @@ case "${CODE_STATE:-}" in
     fresh)   mark "step code The latest from GitHub, just downloaded$CODE_AT" ;;
     latest)  mark "step code Already the latest on GitHub's $BACKEND_BRANCH$CODE_AT" ;;
     updated) mark "step code Updated to the latest on GitHub's $BACKEND_BRANCH$CODE_AT" ;;
-    behind)  mark "step code Older than GitHub's $BACKEND_BRANCH, not updated$CODE_AT: reconnect and choose Update to get the newest features" ;;
+    behind)  mark "step code Older than GitHub's $BACKEND_BRANCH, not updated$CODE_AT (MARGIE_NO_UPDATE=1)" ;;
     dirty)   mark "step code Not updated: the copy on the HPC has changes of its own$CODE_AT" ;;
     nofetch) mark "step code Could not check GitHub; running what is there$CODE_AT" ;;
     *)       mark "step code Running the copy in $BACKEND_DIR$CODE_AT" ;;
