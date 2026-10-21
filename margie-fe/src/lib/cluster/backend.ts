@@ -609,8 +609,21 @@ const PATHS: Record<string, string> = {
 	// Where margie-build is, which builds containers and databases (Install).
 	build_repo: 'Build recipes (margie-build)'
 };
-// Per-database paths are set by the API (services/user_stores.py), not edited here.
-const EXTENDED: Record<string, string> = {};
+// The databases a run reads (set to the working copies by the API, services/user_stores.py; editable
+// for files that were moved) and where a first run copies each one from.
+const EXTENDED: Record<string, string> = {
+	'operon_database.occ_reference_pkl': 'Operon reference (occ_reference.pkl)',
+	'fingerprint_database.path': 'Fingerprint database (fingerprint-database.tsv)',
+	'report_figures.operon_db': 'Operon fingerprint database, label-ordered',
+	'genome_pool.path': 'Genome pool folder',
+	'stores.base.job_db': 'First run copies the job database from',
+	'stores.base.occ': 'First run copies the operon reference from',
+	'stores.base.fingerprint': 'First run copies the fingerprint databases from',
+	'stores.base.genome_pool': 'First run copies the genome pool from',
+	'scoring_results_historical.path': 'Scoring archive folder',
+	'final_tables_depot.path': 'Final tables folder',
+	'sqlite_pipeline_snapshot.path': 'Database snapshots folder'
+};
 const COMPUTE: Record<string, string> = {
 	account: 'SLURM account',
 	partition: 'Partition',
@@ -656,7 +669,8 @@ function describeParam(p: Param, toolLabel: Map<string, string>): { label: strin
 	}
 	const rest = key.slice(WORKFLOW.length + 1);
 	if (PATHS[rest]) return { label: PATHS[rest], group: 'Folders' };
-	if (EXTENDED[rest] || isWorkflowPathParam(key)) return { label: EXTENDED[rest] ?? humanize(rest), group: 'Other folders' };
+	if (EXTENDED[rest]) return { label: EXTENDED[rest], group: 'Databases' };
+	if (isWorkflowPathParam(key)) return { label: humanize(rest), group: 'Other folders' };
 	const [head, field] = rest.split('.');
 	if (!field) return { label: DEFAULTS[head] ?? humanize(head), group: 'Phases' };
 	const phase = head.match(/^phase(\d+)$/);

@@ -3,7 +3,7 @@
 	import { tick, untrack } from 'svelte';
 	import { beforeNavigate } from '$app/navigation';
 	import { page } from '$app/state';
-	import { Bot, Cpu, Folder, FolderOpen, Folders, HardDrive, Layers, ListChecks, Lock, MemoryStick, RotateCcw, ScrollText, Server, SlidersHorizontal, Wrench } from 'lucide-svelte';
+	import { Bot, Cpu, Database, Folder, FolderOpen, Folders, HardDrive, Layers, ListChecks, Lock, MemoryStick, RotateCcw, ScrollText, Server, SlidersHorizontal, Wrench } from 'lucide-svelte';
 	import { api, formatBytes } from '$lib/api';
 	import { LICENCE_LEGAL_NOTICE, LICENCE_STATEMENT, statementMatches } from '$lib/licence';
 	import Switch from '$lib/workspace/Switch.svelte';
@@ -36,6 +36,8 @@
 		// A cluster's: resources shared by every tool, per phase, and per tool.
 		{ id: 'phases', title: 'Phases', icon: Layers, match: (s) => s.group === 'Phases', wide: true },
 		{ id: 'per-tool', title: 'Per tool', icon: SlidersHorizontal, match: (s) => s.group === 'Per tool', closed: true, wide: true },
+		// A cluster's: the databases a run reads and grows (your working copies) and where a first run copies them from.
+		{ id: 'databases', title: 'Databases', icon: Database, match: (s) => s.group === 'Databases' },
 		// Derived from the folders above; rarely changed.
 		{ id: 'other-folders', title: 'Other folders', icon: Folders, match: (s) => s.group === 'Other folders' },
 		// The built-in model for Chat with the genome.

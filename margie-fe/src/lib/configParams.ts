@@ -15,6 +15,11 @@ const EXTENDED_WORKFLOW_PATH_PARAMS = new Set([
 	'margie_sb.final_tables_depot.path',
 	'margie_sb.report_figures.operon_db',
 	'margie_sb.sqlite_pipeline_snapshot.path',
+	// Where a first run copies each database from (empty: the group folder).
+	'margie_sb.stores.base.job_db',
+	'margie_sb.stores.base.occ',
+	'margie_sb.stores.base.fingerprint',
+	'margie_sb.stores.base.genome_pool',
 ]);
 
 export function isWorkflowPathParam(param: string): boolean {
