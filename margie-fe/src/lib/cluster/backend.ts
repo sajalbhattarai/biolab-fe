@@ -275,7 +275,8 @@ const RULE_COL: Record<string, string> = {
 	run_aai_batch: 'aai',
 	run_closest_organisms_batch: 'closest'
 };
-const colOf = (rule: string) => RULE_COL[rule] ?? (/^run_[a-z0-9]+$/.test(rule) ? rule.slice(4) : null);
+/** A cache hit is recorded under the bare tool name (job_runner.py), a SLURM job under its rule. */
+const colOf = (rule: string) => RULE_COL[rule] ?? (/^run_[a-z0-9]+$/.test(rule) ? rule.slice(4) : /^[a-z0-9]+$/.test(rule) ? rule : null);
 /** SLURM's elapsed time ("12:34", "1:02:03", "2-01:02:03") in ms. */
 function elapsedMs(t: string | undefined): number {
 	if (!t) return 0;
@@ -651,8 +652,6 @@ const PATHS: Record<string, string> = {
 	output_path: 'Results folder',
 	sif_path: 'Containers folder',
 	db_root: 'Databases folder',
-	// Where your own databases and run archives live, and where "Back up to depot" puts copies.
-	stores_root: 'Working folder',
 	backup_root: 'Backup location',
 	// Where margie-build is, which builds containers and databases (Install).
 	build_repo: 'Build recipes (margie-build)'
@@ -660,6 +659,8 @@ const PATHS: Record<string, string> = {
 // The databases a run reads (set to the working copies by the API, services/user_stores.py; editable
 // for files that were moved) and where a first run copies each one from.
 const EXTENDED: Record<string, string> = {
+	shared_root: "Group folder (your group's shared MARGIE folder)",
+	stores_root: 'Working folder (your copies of the databases)',
 	'operon_database.occ_reference_pkl': 'Operon reference (occ_reference.pkl)',
 	'fingerprint_database.path': 'Fingerprint database (fingerprint-database.tsv)',
 	'report_figures.operon_db': 'Operon fingerprint database, label-ordered',

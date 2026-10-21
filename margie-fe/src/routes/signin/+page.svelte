@@ -180,6 +180,9 @@
 		font-size: var(--cr-fs-body);
 	}
 	.bar {
+		/* Above the page, so the theme and Customize menus open over it rather than under it. */
+		position: relative;
+		z-index: 5;
 		flex-shrink: 0;
 		display: flex;
 		align-items: center;
