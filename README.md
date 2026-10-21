@@ -53,8 +53,8 @@ The easiest way to use MARGIE: install the desktop app from **[Releases](https:/
 | macOS (Apple silicon and Intel) | `MARGIE-<version>-universal.dmg` (or `-arm64.dmg` for Apple silicon only) |
 | Windows (64-bit PC) | `MARGIE-<version>-x64-setup.exe`, or `MARGIE-<version>-win.zip` (unzip, then run `MARGIE.exe`) |
 | Windows on ARM | `MARGIE-<version>-arm64-win.zip` (unzip, then run `MARGIE.exe`) |
-| Debian, Ubuntu | `MARGIE-<version>-x64.deb` or `-arm64.deb` (`sudo apt install ./MARGIE-<version>-x64.deb`) |
-| Any Linux | `MARGIE-<version>-x64.AppImage` or `-arm64.AppImage` (`chmod +x`, then run) |
+| Debian, Ubuntu | `MARGIE-<version>-amd64.deb` or `-arm64.deb` (`sudo apt install ./MARGIE-<version>-amd64.deb`) |
+| Any Linux | `MARGIE-<version>-x86_64.AppImage` or `-arm64.AppImage` (`chmod +x`, then run) |
 
 The apps are not yet signed, so the first launch asks for confirmation:
 - **macOS:** right-click MARGIE in Applications, choose **Open**, then **Open** again.
