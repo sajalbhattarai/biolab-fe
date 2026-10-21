@@ -26,5 +26,6 @@
 	"devDependencies": {
 		"electron": "^44.4.4",
 		"electron-builder": "^26.0.12"
-	}
+	},
+	"homepage": "https://github.com/sajalbhattarai/biolab-fe"
 }
