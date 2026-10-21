@@ -185,7 +185,8 @@
 
 	/** A tool run's state from the clock: done, failed, under way (with an estimate when there is one), or cut short. */
 	function fromClock(tool: string, genome: string): Cell | null {
-		const e = started.get(`${tool}\t${genome}`);
+		// A batch job on the cluster (GTDB-Tk, QUAST, the comparisons) has no genome and stands for all.
+		const e = started.get(`${tool}\t${genome}`) ?? started.get(`${tool}\t`);
 		if (!e) return null;
 		if (e.ok) return { state: 'done', pct: 100, say: 'done, 100%' };
 		if (e.failed) return { state: 'failed', pct: 0, say: 'failed (see the log)' };
@@ -240,7 +241,7 @@
 				return fromLog('figures', genome)?.state === 'wait' ? { state: 'wait', pct: null, say: 'being written' } : none;
 		}
 		if ((RESULT_STAGES as readonly string[]).includes(col) || (COMPARE_TOOLS as readonly string[]).includes(col)) {
-			const l = fromLog(col, genome);
+			const l = fromLog(col, genome) ?? fromClock(col, genome);
 			// Not in the log but the report is there: done before (a cache hands it back without running it).
 			if (l && !(l.state === 'na' && r?.final?.table)) return l;
 			if (has(col) === 'done' || r?.final?.table) return done();

@@ -7,7 +7,7 @@
 import { ApiError, type Run } from '$lib/api';
 import { isWorkflowPathParam } from '$lib/configParams';
 import { backend } from '$lib/workspace/backend.svelte';
-import type { CheckRow, Genome, GenomeSummary, OrganismResult, Overview, Setting, SetupRow, Tool } from '$lib/workspace/data.svelte';
+import type { CheckRow, Genome, GenomeSummary, OrganismResult, Overview, Setting, SetupRow, Tool, ToolClock } from '$lib/workspace/data.svelte';
 import { FinalTally, type FinalCounts } from '$lib/workspace/final-summary';
 import { TABLE_EXT, extOf, parseDelimited, queryFromParams, queryLoaded, type CellStyle, type Table } from '$lib/workspace/viewers/table-query';
 import { sheetsOf } from '$lib/workspace/viewers/excel-sheets';
@@ -85,6 +85,8 @@ interface JobRow {
 	steps_done?: number | null;
 	steps_total?: number | null;
 	status_note?: string | null;
+	/** Each tool's SLURM job on each genome, as the API tracks them (job_runner.py). */
+	slurm_jobs?: { job_id: string; rule?: string | null; status: string; time?: string; genome?: string | null; source?: string }[] | null;
 }
 interface Entry {
 	name: string;
@@ -261,17 +263,63 @@ async function listRuns() {
  * Returns a job and the new part of its log. The API slices the log
  * (log_tail / log_offset); an older API sends it whole and it is sliced here.
  */
+/** A SLURM job's rule as the Analyze grid's column: run_<tool> is that tool; the step rules map to their step. */
+const RULE_COL: Record<string, string> = {
+	run_gtdbtk_batch: 'gtdbtk',
+	run_quast_batch: 'quast',
+	run_report_figures_one_genome: 'figures',
+	run_genome_viewer_one_genome: 'viewer',
+	build_gene_evidence_report: 'evidence',
+	run_operon_fingerprint: 'fingerprint',
+	run_ani_batch: 'ani',
+	run_aai_batch: 'aai',
+	run_closest_organisms_batch: 'closest'
+};
+const colOf = (rule: string) => RULE_COL[rule] ?? (/^run_[a-z0-9]+$/.test(rule) ? rule.slice(4) : null);
+/** SLURM's elapsed time ("12:34", "1:02:03", "2-01:02:03") in ms. */
+function elapsedMs(t: string | undefined): number {
+	if (!t) return 0;
+	const [days, rest] = t.includes('-') ? t.split('-') : ['0', t];
+	const parts = rest.split(':').map(Number);
+	const secs = parts.reduce((a, b) => a * 60 + b, 0);
+	return (Number(days) * 86400 + secs) * 1000;
+}
+/**
+ * The run's tool clock from its SLURM jobs: one entry per tool and genome with whether it
+ * finished, failed or is still going. A batch rule's entry has no genome and stands for all.
+ */
+function clockOf(j: JobRow): ToolClock | null {
+	const jobs = j.slurm_jobs ?? [];
+	if (!jobs.length) return null;
+	const now = Date.now();
+	const started = new Map<string, ToolClock['started'][number]>();
+	for (const sj of jobs) {
+		const tool = colOf(sj.rule ?? '');
+		if (!tool) continue;
+		const s = String(sj.status || '').toUpperCase();
+		const ok = s === 'COMPLETED' || s === 'CACHED';
+		const failed = ['FAILED', 'CANCELLED', 'TIMEOUT', 'OUT_OF_MEMORY', 'NODE_FAIL'].includes(s);
+		const key = `${tool}\t${sj.genome ?? ''}`;
+		// The latest job of a tool on a genome counts (a retry replaces an earlier failure).
+		const prev = started.get(key);
+		if (prev && prev.ok) continue;
+		started.set(key, { tool, genome: sj.genome ?? '', start: now - elapsedMs(sj.time), last: now, ok, failed });
+	}
+	return { typical: {}, started: [...started.values()], now };
+}
+
 async function runDetail(id: string, params: URLSearchParams) {
 	const tail = Number(params.get('tail')) || 0;
 	const offset = Math.max(0, Number(params.get('offset')) || 0);
 	const ask = tail ? `?log_tail=${tail}` : `?log_offset=${offset}`;
 	const j = await get<JobRow & { logs_size?: number; logs_offset?: number }>(`/v1/ssh/job_status/${q(id)}${ask}`);
 	const got = j.logs ?? '';
+	const clock = clockOf(j);
 	if (typeof j.logs_size === 'number') {
-		return { run: toRun(j), step: j.phase ?? '', log: { text: got, offset: j.logs_size, size: j.logs_size } };
+		return { run: toRun(j), step: j.phase ?? '', log: { text: got, offset: j.logs_size, size: j.logs_size }, clock };
 	}
 	const text = tail ? got.slice(-tail) : got.slice(Math.min(offset, got.length));
-	return { run: toRun(j), step: j.phase ?? '', log: { text, offset: got.length, size: got.length } };
+	return { run: toRun(j), step: j.phase ?? '', log: { text, offset: got.length, size: got.length }, clock };
 }
 
 /** Builds the tool selection from the request and config, then submits the workflow. */
