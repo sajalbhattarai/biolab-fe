@@ -22,6 +22,14 @@ Runs on **macOS** | **Windows** | **Linux**.
 
 </div>
 
+## Three ways to use MARGIE
+
+| | Best for | Start here |
+|---|---|---|
+| **Desktop app** | Most people. macOS, Windows and Linux. Runs on this computer or on your HPC. | [Download the app](#download) |
+| **GUI in the browser** | Running the interface from source, on your computer or hosted for a group. | [How to run](#run-mac) |
+| **Command line** | HPC users who prefer a terminal; the same pipeline, no interface. | [bioinformatics-tools, branch `margie-backend`](https://github.com/sajalbhattarai/bioinformatics-tools/tree/margie-backend) |
+
 ## Repo scope
 
 This is the **`margie-frontend`** branch of biolab-fe: MARGIE's interface, desktop app and local pipeline.
@@ -29,7 +37,7 @@ This is the **`margie-frontend`** branch of biolab-fe: MARGIE's interface, deskt
 | Folder | What it is |
 |---|---|
 | `margie-fe/` | The interface (SvelteKit): pages, the HPC connection, and the server that drives runs. |
-| `margie-desktop/` | The desktop app for macOS and Windows (Electron), built around `margie-fe`. |
+| `margie-desktop/` | The desktop app for macOS, Windows and Linux (Electron), built around `margie-fe`. |
 | `margie-pipeline/` | The annotation pipeline MARGIE runs on this computer (bash, containers, Python). |
 
 The HPC side (pipeline, CLI, API) lives in **[bioinformatics-tools, branch `margie-backend`](https://github.com/sajalbhattarai/bioinformatics-tools/tree/margie-backend)**.
@@ -43,12 +51,16 @@ The easiest way to use MARGIE: install the desktop app from **[Releases](https:/
 | System | File |
 |---|---|
 | macOS (Apple silicon and Intel) | `MARGIE-<version>-universal.dmg` (or `-arm64.dmg` for Apple silicon only) |
-| Windows (64-bit PC) | `MARGIE-<version>-x64-setup.exe` |
+| Windows (64-bit PC) | `MARGIE-<version>-x64-setup.exe`, or `MARGIE-<version>-win.zip` (unzip, then run `MARGIE.exe`) |
 | Windows on ARM | `MARGIE-<version>-arm64-win.zip` (unzip, then run `MARGIE.exe`) |
+| Debian, Ubuntu | `MARGIE-<version>-x64.deb` or `-arm64.deb` (`sudo apt install ./MARGIE-<version>-x64.deb`) |
+| Any Linux | `MARGIE-<version>-x64.AppImage` or `-arm64.AppImage` (`chmod +x`, then run) |
 
 The apps are not yet signed, so the first launch asks for confirmation:
 - **macOS:** right-click MARGIE in Applications, choose **Open**, then **Open** again.
 - **Windows:** in the SmartScreen notice, choose **More info → Run anyway**.
+
+On the start page, under the HPC card's **Advanced settings**, enter your group's shared MARGIE folder on the cluster (ask whoever set MARGIE up for your group). A new cluster account copies its base databases from there.
 
 MARGIE opens on its start page: choose **This computer** or **Your HPC cluster** (see [First run](#first-run)).
 - **HPC:** works as soon as you connect.
@@ -67,7 +79,9 @@ npm ci
 npm start                 # runs the app without packaging it
 npm run dist:arm64        # macOS, Apple silicon: dist/MARGIE-<version>-arm64.dmg
 npm run dist              # macOS, universal .dmg
-npm run dist:win          # on Windows: x64 installer and x64/arm64 zips
+npm run dist:win          # Windows: x64 installer and x64/arm64 zips
+npm run dist:linux        # Linux: .deb and AppImage, x64 and arm64
+npm run dist:all          # all three from a Mac
 ```
 
 The build takes the pipeline from `margie-pipeline/` in this branch. See [margie-desktop/README.md](margie-desktop/README.md) for details.
